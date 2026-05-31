@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Ví Nợ">
@@ -14,15 +14,38 @@
   --bg:#0A0A0F; --card:#13131A; --card2:#1A1A24; --border:rgba(255,255,255,0.07);
   --accent:#C8FF57; --blue:#57C8FF; --red:#FF5757; --orange:#FFB347; --purple:#C57BFF;
   --text:#F0F0F8; --sub:rgba(240,240,248,0.42);
-  --safe-t:env(safe-area-inset-top,0px); --safe-b:env(safe-area-inset-bottom,0px);
+  --safe-t:env(safe-area-inset-top,0px);
+  --safe-b:env(safe-area-inset-bottom,0px);
+  --safe-l:env(safe-area-inset-left,0px);
+  --safe-r:env(safe-area-inset-right,0px);
 }
-*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-body{font-family:'Mulish',sans-serif;background:var(--bg);color:var(--text);min-height:100dvh;overflow-x:hidden;-webkit-font-smoothing:antialiased}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+html,body{
+  font-family:'Mulish',sans-serif;
+  background:var(--bg);color:var(--text);
+  height:100%;width:100%;
+  overflow:hidden;
+  -webkit-font-smoothing:antialiased;
+  -webkit-text-size-adjust:100%;
+  text-size-adjust:100%;
+}
 
 /* PAGES */
-.page{display:none;flex-direction:column;height:100dvh}
+.page{display:none;flex-direction:column;height:100dvh;width:100%}
 .page.active{display:flex}
-.scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-top:calc(var(--safe-t)+14px);padding-bottom:calc(var(--safe-b)+72px)}
+
+/* SCROLL AREA — respects top notch + bottom home bar */
+.scroll{
+  flex:1;
+  overflow-y:auto;
+  overflow-x:hidden;
+  -webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain;
+  padding-top:calc(var(--safe-t) + 14px);
+  padding-bottom:calc(var(--safe-b) + 80px);
+  padding-left:var(--safe-l);
+  padding-right:var(--safe-r);
+}
 
 /* TOP BAR */
 .top-bar{padding:0 20px 16px;display:flex;justify-content:space-between;align-items:center}
@@ -32,10 +55,20 @@ body{font-family:'Mulish',sans-serif;background:var(--bg);color:var(--text);min-
   font-size:13px;font-weight:800;color:var(--accent);cursor:pointer;display:flex;align-items:center;gap:5px}
 .month-pill:active{transform:scale(.95)}
 
+/* SYNC STATUS */
+.sync-badge{display:flex;align-items:center;gap:5px;font-size:10px;font-weight:700;
+  padding:4px 10px;border-radius:100px;margin:0 20px 10px;
+  background:var(--card2);border:1px solid var(--border);width:fit-content;color:var(--sub)}
+.sync-dot{width:6px;height:6px;border-radius:50%;background:var(--sub);flex-shrink:0}
+.sync-badge.synced .sync-dot{background:var(--accent)}
+.sync-badge.syncing .sync-dot{background:var(--orange);animation:pulse .8s infinite}
+.sync-badge.error .sync-dot{background:var(--red)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
 /* SECTION LABEL */
 .slabel{padding:0 20px 9px;font-size:11px;font-weight:800;color:var(--sub);text-transform:uppercase;letter-spacing:.8px;margin-top:4px}
 
-/* ── DASHBOARD CARDS ── */
+/* DASHBOARD CARDS */
 .dash-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 16px 4px}
 .dash-card{border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:4px;position:relative;overflow:hidden}
 .dash-card .dc-label{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;opacity:.65}
@@ -46,7 +79,7 @@ body{font-family:'Mulish',sans-serif;background:var(--bg);color:var(--text);min-
 .dash-card.debt   {background:linear-gradient(135deg,#10182A,#0F1018); color:var(--blue)}
 .dash-card.free   {background:linear-gradient(135deg,#1A1024,#120F1A); color:var(--purple)}
 
-/* ratio bar */
+/* RATIO BAR */
 .ratio-wrap{padding:0 16px 4px}
 .ratio-bar{height:6px;background:var(--card2);border-radius:100px;overflow:hidden;display:flex;gap:2px}
 .ratio-seg{height:100%;border-radius:100px;transition:width .5s cubic-bezier(.4,0,.2,1)}
@@ -54,7 +87,7 @@ body{font-family:'Mulish',sans-serif;background:var(--bg);color:var(--text);min-
 .ratio-item{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:700;color:var(--sub)}
 .ratio-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
 
-/* progress */
+/* PROGRESS */
 .prog-wrap{padding:0 16px 4px}
 .prog-top{display:flex;justify-content:space-between;margin-bottom:7px}
 .prog-top span{font-size:12px;font-weight:700;color:var(--sub)}
@@ -74,7 +107,6 @@ body{font-family:'Mulish',sans-serif;background:var(--bg);color:var(--text);min-
 .dcard{background:var(--card);border:1px solid var(--border);border-radius:18px;overflow:hidden;transition:border-color .25s}
 .dcard.paid{border-color:rgba(200,255,87,.35)}
 .dcard-top{display:flex;align-items:center;padding:14px 13px 14px 16px;gap:11px;cursor:pointer;user-select:none}
-.dcard-top .paid-opacity{transition:opacity .3s}
 .dcard.paid .dcard-top{opacity:.55}
 .d-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
 .d-dot.td{background:var(--orange)}.d-dot.tc{background:var(--blue)}.d-dot.ok{background:var(--accent)}
@@ -97,13 +129,20 @@ body{font-family:'Mulish',sans-serif;background:var(--bg);color:var(--text);min-
 .dd-inner{display:grid;grid-template-columns:1fr 1fr 1fr;padding:11px 16px;gap:8px}
 .dd-i label{font-size:10px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.4px}
 .dd-i p{font-size:13px;font-weight:800;margin-top:3px}
-
 .empty{text-align:center;padding:44px 20px;color:var(--sub);font-size:13px;font-weight:700}
 
-/* BOTTOM NAV */
-.bnav{position:fixed;bottom:0;left:0;right:0;background:rgba(10,10,15,.94);backdrop-filter:blur(20px);
-  -webkit-backdrop-filter:blur(20px);border-top:1px solid var(--border);
-  padding:8px 0 calc(var(--safe-b)+4px);display:flex;z-index:100}
+/* BOTTOM NAV — sits above home bar */
+.bnav{
+  position:fixed;bottom:0;left:0;right:0;
+  background:rgba(10,10,15,.96);
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  border-top:1px solid var(--border);
+  padding-top:8px;
+  padding-bottom:calc(var(--safe-b) + 6px);
+  padding-left:var(--safe-l);
+  padding-right:var(--safe-r);
+  display:flex;z-index:100;
+}
 .ni{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;padding:2px 0;transition:opacity .2s}
 .ni:active{opacity:.6}
 .ni-icon{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:18px;transition:all .2s cubic-bezier(.4,0,.2,1)}
@@ -112,10 +151,21 @@ body{font-family:'Mulish',sans-serif;background:var(--bg);color:var(--text);min-
 .ni.active .ni-label{color:var(--accent)}
 
 /* SETTINGS PAGE */
-.page-hdr{padding:calc(var(--safe-t)+14px) 20px 16px}
+.page-hdr{
+  padding-top:calc(var(--safe-t) + 14px);
+  padding-bottom:16px;
+  padding-left:calc(var(--safe-l) + 20px);
+  padding-right:calc(var(--safe-r) + 20px);
+}
 .page-hdr h2{font-size:20px;font-weight:900}
 .page-hdr p{font-size:12px;font-weight:600;color:var(--sub);margin-top:2px}
-.settings-scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:0 16px calc(var(--safe-b)+76px)}
+.settings-scroll{
+  flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;
+  padding-top:0;
+  padding-bottom:calc(var(--safe-b) + 80px);
+  padding-left:calc(var(--safe-l) + 16px);
+  padding-right:calc(var(--safe-r) + 16px);
+}
 
 .sg{margin-bottom:20px}
 .sg-label{font-size:11px;font-weight:800;color:var(--sub);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;padding-left:2px}
@@ -134,16 +184,21 @@ body{font-family:'Mulish',sans-serif;background:var(--bg);color:var(--text);min-
   background:var(--card);border:1px dashed rgba(87,200,255,.3);border-radius:18px;margin-top:8px}
 .add-row:active{opacity:.7}
 .danger .s-name{color:var(--red)}
-
-/* FINANCE SETTING ROWS */
 .fin-val{font-size:15px;font-weight:900;color:var(--accent)}
 
 /* MODAL */
-.modal-bg{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.72);
-  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);z-index:300;align-items:flex-end;justify-content:center}
+.modal-bg{display:none;position:fixed;top:0;left:0;right:0;bottom:0;
+  background:rgba(0,0,0,.72);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  z-index:300;align-items:flex-end;justify-content:center}
 .modal-bg.open{display:flex}
-.msheet{background:var(--card2);border:1px solid var(--border);border-radius:28px 28px 0 0;
-  padding:6px 20px calc(var(--safe-b)+24px);width:100%;max-width:430px}
+.msheet{
+  background:var(--card2);border:1px solid var(--border);border-radius:28px 28px 0 0;
+  padding:6px 20px;
+  padding-bottom:calc(var(--safe-b) + 24px);
+  width:100%;max-width:430px;
+  padding-left:calc(var(--safe-l) + 20px);
+  padding-right:calc(var(--safe-r) + 20px);
+}
 .mhandle{width:36px;height:4px;background:rgba(255,255,255,.13);border-radius:2px;margin:12px auto 18px}
 .mtitle{font-size:18px;font-weight:900;text-align:center;margin-bottom:18px}
 .fg{margin-bottom:13px}
@@ -161,8 +216,12 @@ body{font-family:'Mulish',sans-serif;background:var(--bg);color:var(--text);min-
 .mbtn-del{background:var(--red);color:#fff;display:none}
 
 /* MONTH PICKER */
-.mpsheet{background:var(--card2);border:1px solid var(--border);border-radius:28px 28px 0 0;
-  padding:6px 20px calc(var(--safe-b)+28px);width:100%;max-width:430px}
+.mpsheet{
+  background:var(--card2);border:1px solid var(--border);border-radius:28px 28px 0 0;
+  padding:6px 20px;
+  padding-bottom:calc(var(--safe-b) + 28px);
+  width:100%;max-width:430px;
+}
 .mptitle{font-size:16px;font-weight:900;text-align:center;margin:12px 0 16px}
 .mpgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
 .mpbtn{padding:13px 0;border-radius:14px;border:1px solid var(--border);background:var(--card);
@@ -171,18 +230,61 @@ body{font-family:'Mulish',sans-serif;background:var(--bg);color:var(--text);min-
 .mpbtn:active{transform:scale(.94)}
 
 /* TOAST */
-.toast{position:fixed;bottom:calc(var(--safe-b)+84px);left:50%;transform:translateX(-50%) translateY(10px);
+.toast{position:fixed;bottom:calc(var(--safe-b) + 90px);left:50%;transform:translateX(-50%) translateY(10px);
   background:var(--card2);border:1px solid var(--border);color:var(--text);font-family:'Mulish',sans-serif;
   font-size:13px;font-weight:700;padding:11px 20px;border-radius:100px;opacity:0;
   transition:all .28s cubic-bezier(.4,0,.2,1);pointer-events:none;z-index:999;white-space:nowrap;
   box-shadow:0 8px 32px rgba(0,0,0,.4)}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* LOADING OVERLAY */
+.loading-overlay{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:16px;z-index:999;transition:opacity .4s}
+.loading-overlay.hidden{opacity:0;pointer-events:none}
+.spinner{width:36px;height:36px;border:3px solid var(--card2);border-top-color:var(--accent);
+  border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-overlay p{font-size:13px;font-weight:700;color:var(--sub)}
+
+/* AUTH SCREEN */
+.auth-page{display:none;flex-direction:column;align-items:center;justify-content:center;
+  height:100dvh;padding:32px 24px;gap:12px}
+.auth-page.active{display:flex}
+.auth-logo{font-size:48px;margin-bottom:8px}
+.auth-title{font-size:24px;font-weight:900;letter-spacing:-.5px}
+.auth-sub{font-size:13px;font-weight:600;color:var(--sub);text-align:center;margin-bottom:8px}
+.auth-btn{display:flex;align-items:center;justify-content:center;gap:10px;
+  width:100%;max-width:320px;padding:15px 20px;border-radius:16px;border:none;cursor:pointer;
+  font-family:'Mulish',sans-serif;font-size:15px;font-weight:800;transition:opacity .2s}
+.auth-btn:active{opacity:.8}
+.auth-google{background:#fff;color:#1a1a1a}
+.auth-anon{background:var(--card2);color:var(--sub);border:1px solid var(--border);margin-top:4px;font-size:13px}
+.auth-divider{font-size:11px;font-weight:700;color:var(--sub);margin:4px 0}
 </style>
 </head>
 <body>
 
-<!-- ══ PAGE: HOME ══ -->
-<div class="page active" id="page-home">
+<!-- LOADING -->
+<div class="loading-overlay" id="loading-overlay">
+  <div class="spinner"></div>
+  <p>Đang kết nối…</p>
+</div>
+
+<!-- AUTH SCREEN -->
+<div class="auth-page" id="auth-page">
+  <div class="auth-logo">💳</div>
+  <div class="auth-title">Ví Nợ</div>
+  <div class="auth-sub">Đăng nhập để đồng bộ dữ liệu<br>trên mọi thiết bị</div>
+  <button class="auth-btn auth-google" onclick="signInGoogle()">
+    <svg width="20" height="20" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+    Tiếp tục với Google
+  </button>
+  <div class="auth-divider">hoặc</div>
+  <button class="auth-btn auth-anon" onclick="signInAnon()">Dùng không cần đăng nhập</button>
+</div>
+
+<!-- PAGE: HOME -->
+<div class="page" id="page-home">
 <div class="scroll">
 
   <div class="top-bar">
@@ -194,6 +296,11 @@ body{font-family:'Mulish',sans-serif;background:var(--bg);color:var(--text);min-
       <span id="month-label">—</span>
       <svg width="10" height="6" viewBox="0 0 10 6" fill="none"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </div>
+  </div>
+
+  <div class="sync-badge" id="sync-badge">
+    <div class="sync-dot"></div>
+    <span id="sync-text">Đang kết nối…</span>
   </div>
 
   <!-- 4 KPI cards -->
@@ -234,7 +341,7 @@ body{font-family:'Mulish',sans-serif;background:var(--bg);color:var(--text);min-
     </div>
   </div>
 
-  <!-- Progress tick -->
+  <!-- Progress -->
   <div class="prog-wrap" style="margin-top:14px">
     <div class="prog-top">
       <span>Tiến độ thanh toán nợ</span>
@@ -254,11 +361,10 @@ body{font-family:'Mulish',sans-serif;background:var(--bg);color:var(--text);min-
   </div>
 
   <div id="card-list"></div>
-
 </div>
 </div>
 
-<!-- ══ PAGE: SETTINGS ══ -->
+<!-- PAGE: SETTINGS -->
 <div class="page" id="page-settings">
 <div class="page-hdr">
   <h2>Cài đặt ⚙️</h2>
@@ -266,21 +372,18 @@ body{font-family:'Mulish',sans-serif;background:var(--bg);color:var(--text);min-
 </div>
 <div class="settings-scroll">
 
-  <!-- THU NHẬP -->
   <div class="sg">
     <div class="sg-label">💵 Thu nhập hàng tháng</div>
     <div class="slist" id="list-income"></div>
     <div class="add-row" onclick="openFinModal('income')">＋ Thêm nguồn thu nhập</div>
   </div>
 
-  <!-- CHI PHÍ CỐ ĐỊNH -->
   <div class="sg">
     <div class="sg-label">🧾 Chi phí cố định / tháng</div>
     <div class="slist" id="list-expense"></div>
     <div class="add-row" onclick="openFinModal('expense')">＋ Thêm chi phí</div>
   </div>
 
-  <!-- NỢ -->
   <div class="sg">
     <div class="sg-label">💳 Thẻ Tín Dụng</div>
     <div class="slist" id="list-td"></div>
@@ -293,7 +396,26 @@ body{font-family:'Mulish',sans-serif;background:var(--bg);color:var(--text);min-
     <div class="add-row" onclick="openDebtModal('tc')">＋ Thêm khoản vay</div>
   </div>
 
-  <!-- DANGER -->
+  <div class="sg">
+    <div class="sg-label">Tài khoản</div>
+    <div class="slist">
+      <div class="srow" onclick="showAccountInfo()">
+        <div class="s-ico" style="background:rgba(87,200,255,.1)">👤</div>
+        <div class="s-info">
+          <div class="s-name" id="acc-name">—</div>
+          <div class="s-val" id="acc-email">—</div>
+        </div>
+      </div>
+      <div class="srow" onclick="signOut()">
+        <div class="s-ico" style="background:rgba(255,87,87,.1)">🚪</div>
+        <div class="s-info">
+          <div class="s-name" style="color:var(--red)">Đăng xuất</div>
+          <div class="s-val">Xóa phiên đăng nhập</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="sg">
     <div class="sg-label">Nguy hiểm</div>
     <div class="slist">
@@ -343,7 +465,7 @@ body{font-family:'Mulish',sans-serif;background:var(--bg);color:var(--text);min-
   </div>
 </div>
 
-<!-- MODAL: FINANCE (income / expense) -->
+<!-- MODAL: FINANCE -->
 <div class="modal-bg" id="modal-fin" onclick="closeMBg('modal-fin',event)">
   <div class="msheet">
     <div class="mhandle"></div>
@@ -370,8 +492,185 @@ body{font-family:'Mulish',sans-serif;background:var(--bg);color:var(--text);min-
 
 <div class="toast" id="toast"></div>
 
+<!-- ══════════════════════════════════════════════════════════
+     FIREBASE SDK
+     ══════════════════════════════════════════════════════════ -->
+<script type="module">
+// ─────────────────────────────────────────────────────────────
+//  ⚠️  THAY THẾ config bên dưới bằng config Firebase của bạn
+//  Hướng dẫn lấy config: https://console.firebase.google.com
+//  → Project settings → Your apps → Firebase SDK snippet → Config
+// ─────────────────────────────────────────────────────────────
+const FIREBASE_CONFIG = {
+  apiKey:            "YOUR_API_KEY",
+  authDomain:        "YOUR_PROJECT_ID.firebaseapp.com",
+  projectId:         "YOUR_PROJECT_ID",
+  storageBucket:     "YOUR_PROJECT_ID.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId:             "YOUR_APP_ID"
+};
+
+import { initializeApp }                        from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup,
+         signInAnonymously, onAuthStateChanged,
+         signOut as fbSignOut }                  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, doc, setDoc, getDoc,
+         onSnapshot, collection }                from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+// ── INIT ──────────────────────────────────────────────────────
+const app  = initializeApp(FIREBASE_CONFIG);
+const auth = getAuth(app);
+const db   = getFirestore(app);
+
+let currentUid = null;
+let unsubscribe = null;
+
+// expose to global scope for onclick handlers
+window._fbAuth = auth;
+window._fbSignOut = fbSignOut;
+
+// ── AUTH HANDLERS ─────────────────────────────────────────────
+window.signInGoogle = async () => {
+  try {
+    setSyncStatus('syncing','Đang đăng nhập…');
+    const provider = new GoogleAuthProvider();
+    await signInWithPopup(auth, provider);
+  } catch(e) {
+    setSyncStatus('error','Đăng nhập thất bại');
+    showToast('❌ ' + e.message);
+  }
+};
+
+window.signInAnon = async () => {
+  try {
+    setSyncStatus('syncing','Đang kết nối…');
+    await signInAnonymously(auth);
+  } catch(e) {
+    setSyncStatus('error','Lỗi kết nối');
+    showToast('❌ ' + e.message);
+  }
+};
+
+window.signOut = async () => {
+  if(!confirm('Đăng xuất?')) return;
+  if(unsubscribe) unsubscribe();
+  await fbSignOut(auth);
+};
+
+window.showAccountInfo = () => {
+  const user = auth.currentUser;
+  if(!user) return;
+  const info = user.isAnonymous
+    ? 'Bạn đang dùng chế độ ẩn danh.\nDữ liệu lưu trên thiết bị này.'
+    : `Đã đăng nhập:\n${user.email}`;
+  alert(info);
+};
+
+// ── AUTH STATE ────────────────────────────────────────────────
+onAuthStateChanged(auth, async (user) => {
+  hideLoading();
+  if (user) {
+    currentUid = user.uid;
+    document.getElementById('auth-page').classList.remove('active');
+    document.getElementById('page-home').classList.add('active');
+    document.getElementById('nav-home').classList.add('active');
+
+    // update account info
+    document.getElementById('acc-name').textContent  = user.isAnonymous ? 'Khách (ẩn danh)' : (user.displayName || 'Người dùng');
+    document.getElementById('acc-email').textContent = user.isAnonymous ? 'Không có tài khoản' : user.email;
+
+    setSyncStatus('syncing','Đang đồng bộ…');
+    await loadFromFirestore();
+    listenRealtime();
+    initMonth();
+    renderHome();
+  } else {
+    currentUid = null;
+    if(unsubscribe){ unsubscribe(); unsubscribe=null; }
+    document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+    document.getElementById('auth-page').classList.add('active');
+    setSyncStatus('error','Chưa đăng nhập');
+  }
+});
+
+// ── FIRESTORE HELPERS ─────────────────────────────────────────
+function userDoc(){ return doc(db,'users', currentUid); }
+
+async function loadFromFirestore(){
+  try {
+    const snap = await getDoc(userDoc());
+    if(snap.exists()){
+      const d = snap.data();
+      debts   = d.debts   || clone(DEF_DEBTS);
+      income  = d.income  || clone(DEF_INCOME);
+      expense = d.expense || clone(DEF_EXPENSE);
+      ticks   = d.ticks   || {};
+    } else {
+      // first time — write defaults
+      debts=clone(DEF_DEBTS); income=clone(DEF_INCOME); expense=clone(DEF_EXPENSE); ticks={};
+      await pushToFirestore();
+    }
+    setSyncStatus('synced','Đã đồng bộ');
+  } catch(e) {
+    setSyncStatus('error','Lỗi tải dữ liệu');
+    console.error(e);
+  }
+}
+
+async function pushToFirestore(){
+  if(!currentUid) return;
+  setSyncStatus('syncing','Đang lưu…');
+  try {
+    await setDoc(userDoc(),{debts, income, expense, ticks});
+    setSyncStatus('synced','Đã đồng bộ');
+  } catch(e) {
+    setSyncStatus('error','Lỗi lưu');
+    console.error(e);
+  }
+}
+
+function listenRealtime(){
+  if(unsubscribe) unsubscribe();
+  unsubscribe = onSnapshot(userDoc(), (snap)=>{
+    if(!snap.exists()) return;
+    const d = snap.data();
+    debts   = d.debts   || [];
+    income  = d.income  || [];
+    expense = d.expense || [];
+    ticks   = d.ticks   || {};
+    setSyncStatus('synced','Đã đồng bộ');
+    renderHome();
+    renderSettings();
+  }, (e)=>{
+    setSyncStatus('error','Mất kết nối');
+    console.error(e);
+  });
+}
+
+// expose pushToFirestore for save functions
+window._push = pushToFirestore;
+
+// ── SYNC UI ───────────────────────────────────────────────────
+function setSyncStatus(type, text){
+  const b = document.getElementById('sync-badge');
+  const t = document.getElementById('sync-text');
+  b.className = 'sync-badge ' + type;
+  t.textContent = text;
+}
+
+function hideLoading(){
+  const el = document.getElementById('loading-overlay');
+  el.classList.add('hidden');
+  setTimeout(()=>el.style.display='none', 500);
+}
+
+</script>
+
 <script>
-// ── DEFAULT DATA ──────────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════
+//  APP LOGIC (same as original, save() now calls Firebase)
+// ══════════════════════════════════════════════════════════════
+
 const DEF_DEBTS = [
   {id:'tp',      name:'TP Bank',     type:'td', debt:12000000,  monthly:216000,  note:'1.80%/th'},
   {id:'ocb',     name:'OCB Bank',    type:'td', debt:36300000,  monthly:834900,  note:'2.30%/th'},
@@ -383,42 +682,32 @@ const DEF_DEBTS = [
   {id:'vib1',    name:'VIB Bank 1',  type:'tc', debt:34200505,  monthly:2616000, note:'Kỳ 46/60'},
   {id:'vib2',    name:'VIB Bank 2',  type:'tc', debt:28926071,  monthly:1417000, note:'Kỳ 11/36'},
 ];
-const DEF_INCOME = [
-  {id:'sal', name:'Lương cơ bản', amount:12000000, note:'Hàng tháng'},
-];
-const DEF_EXPENSE = [
-  {id:'living', name:'Sinh hoạt / gia đình', amount:8200000, note:'Cố định'},
-];
+const DEF_INCOME  = [{id:'sal',    name:'Lương cơ bản',          amount:12000000, note:'Hàng tháng'}];
+const DEF_EXPENSE = [{id:'living', name:'Sinh hoạt / gia đình',  amount:8200000,  note:'Cố định'}];
 
-// ── STATE ─────────────────────────────────────────────────────────────────────
-let debts=[], income=[], expense=[], ticks={}, currentMonth='', currentFilter='all', openDetail=null;
+let debts=[], income=[], expense=[], ticks={};
+let currentMonth='', currentFilter='all', openDetail=null;
 let editDebtId=null, editFinId=null, finMode='income';
 
-function load() {
-  try { debts   = JSON.parse(localStorage.getItem('vn_debts')  ||'null') || clone(DEF_DEBTS); }   catch{ debts=clone(DEF_DEBTS); }
-  try { income  = JSON.parse(localStorage.getItem('vn_income') ||'null') || clone(DEF_INCOME); }  catch{ income=clone(DEF_INCOME); }
-  try { expense = JSON.parse(localStorage.getItem('vn_expense')||'null') || clone(DEF_EXPENSE); } catch{ expense=clone(DEF_EXPENSE); }
-  try { ticks   = JSON.parse(localStorage.getItem('vn_ticks')  ||'{}');  }                        catch{ ticks={}; }
-}
-function save(key,val){ localStorage.setItem(key,JSON.stringify(val)); }
+function save(){ if(window._push) window._push(); }
 function clone(x){ return JSON.parse(JSON.stringify(x)); }
 function ms(){ if(!ticks[currentMonth])ticks[currentMonth]={}; return ticks[currentMonth]; }
 function isPaid(id){ return !!ms()[id]; }
-function toggleTick(id){ const m=ms(); m[id]=!m[id]; save('vn_ticks',ticks); }
+function toggleTick(id){ const m=ms(); m[id]=!m[id]; save(); }
 function initMonth(){ const n=new Date(); currentMonth=`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}`; }
 
-// ── FORMAT ────────────────────────────────────────────────────────────────────
+// ── FORMAT ────────────────────────────────────────────────────
 function fmt(n){
   n=Number(n)||0;
-  if(n>=1e9)return(n/1e9).toFixed(1)+'B';
-  if(n>=1e6)return(n/1e6).toFixed(1)+'M';
-  if(n>=1e3)return(n/1e3).toFixed(0)+'K';
+  if(n>=1e9) return(n/1e9).toFixed(1)+'B';
+  if(n>=1e6) return(n/1e6).toFixed(1)+'M';
+  if(n>=1e3) return(n/1e3).toFixed(0)+'K';
   return n.toLocaleString('vi-VN');
 }
 function getML(k){ const[y,m]=k.split('-'); return `T${parseInt(m)}/${y}`; }
 
-// ── RENDER HOME ───────────────────────────────────────────────────────────────
-function renderHome() {
+// ── RENDER HOME ───────────────────────────────────────────────
+function renderHome(){
   const n=new Date();
   document.getElementById('sub-date').textContent = n.toLocaleDateString('vi-VN',{weekday:'long',day:'numeric',month:'numeric'});
   document.getElementById('month-label').textContent = getML(currentMonth);
@@ -434,7 +723,6 @@ function renderHome() {
   document.getElementById('kpi-free').textContent     = freeAmt>=0 ? fmt(freeAmt) : '-'+fmt(Math.abs(freeAmt));
   document.getElementById('kpi-free').style.color     = freeAmt>=0 ? 'var(--purple)' : 'var(--red)';
 
-  // ratio bar
   if(totalIncome>0){
     const ep=Math.min(totalExpense/totalIncome*100,100);
     const dp=Math.min(totalDebtPay/totalIncome*100,100-ep);
@@ -444,7 +732,6 @@ function renderHome() {
     document.getElementById('rb-free').style.width    = fp+'%';
   }
 
-  // progress tick
   const paid    = debts.filter(d=>isPaid(d.id));
   const paidAmt = paid.reduce((s,d)=>s+Number(d.monthly),0);
   const pct     = totalDebtPay ? Math.round(paidAmt/totalDebtPay*100) : 0;
@@ -457,9 +744,9 @@ function renderHome() {
 function renderCards(){
   const list=document.getElementById('card-list'); list.innerHTML='';
   let show=debts;
-  if(currentFilter==='td')    show=debts.filter(d=>d.type==='td');
-  if(currentFilter==='tc')    show=debts.filter(d=>d.type==='tc');
-  if(currentFilter==='unpaid')show=debts.filter(d=>!isPaid(d.id));
+  if(currentFilter==='td')     show=debts.filter(d=>d.type==='td');
+  if(currentFilter==='tc')     show=debts.filter(d=>d.type==='tc');
+  if(currentFilter==='unpaid') show=debts.filter(d=>!isPaid(d.id));
 
   const td=show.filter(d=>d.type==='td'), tc=show.filter(d=>d.type==='tc');
   if(!show.length){ list.innerHTML=`<div class="empty">✅ Tháng này xong rồi!</div>`; return; }
@@ -527,7 +814,6 @@ function tapCheck(id){
   setTimeout(()=>{const b=document.getElementById('cb-'+id);if(b)b.classList.remove('pop');},250);
   const d=debts.find(x=>x.id===id);
   showToast(paid?`✓ ${d.name} đã thanh toán`:`↩ ${d.name} bỏ tick`);
-  // update progress only
   const total=debts.reduce((s,d)=>s+Number(d.monthly),0);
   const paidAmt=debts.filter(d=>isPaid(d.id)).reduce((s,d)=>s+Number(d.monthly),0);
   const pct=total?Math.round(paidAmt/total*100):0;
@@ -542,7 +828,7 @@ function filterTab(f,el){
   el.classList.add('active'); renderCards();
 }
 
-// ── SETTINGS RENDER ───────────────────────────────────────────────────────────
+// ── SETTINGS ──────────────────────────────────────────────────
 function renderSettings(){
   renderFinList('income');
   renderFinList('expense');
@@ -592,7 +878,7 @@ function renderDebtList(type){
   });
 }
 
-// ── DEBT MODAL ────────────────────────────────────────────────────────────────
+// ── DEBT MODAL ────────────────────────────────────────────────
 function openDebtModal(type){
   editDebtId=null;
   document.getElementById('md-title').textContent=type==='td'?'Thêm thẻ tín dụng':'Thêm khoản vay';
@@ -628,17 +914,17 @@ function saveDebt(){
   if(!monthly){showToast('⚠️ Nhập số tiền trả/tháng');return;}
   if(editDebtId){ const d=debts.find(x=>x.id===editDebtId); if(d){d.name=name;d.type=type;d.debt=debt;d.monthly=monthly;d.note=note;} }
   else debts.push({id:'d'+Date.now(),name,type,debt,monthly,note});
-  save('vn_debts',debts); closeModal('modal-debt'); renderSettings(); renderHome();
+  save(); closeModal('modal-debt'); renderSettings(); renderHome();
   showToast(editDebtId?'✓ Đã cập nhật':'✓ Đã thêm');
 }
 function deleteDebt(){
   if(!editDebtId||!confirm('Xoá khoản này?'))return;
   debts=debts.filter(x=>x.id!==editDebtId);
-  save('vn_debts',debts); closeModal('modal-debt'); renderSettings(); renderHome();
+  save(); closeModal('modal-debt'); renderSettings(); renderHome();
   showToast('🗑 Đã xoá');
 }
 
-// ── FINANCE MODAL ─────────────────────────────────────────────────────────────
+// ── FINANCE MODAL ─────────────────────────────────────────────
 function openFinModal(mode){
   finMode=mode; editFinId=null;
   document.getElementById('mf-title').textContent=mode==='income'?'Thêm thu nhập':'Thêm chi phí';
@@ -671,20 +957,18 @@ function saveFin(){
   const list=finMode==='income'?income:expense;
   if(editFinId){ const it=list.find(x=>x.id===editFinId); if(it){it.name=name;it.amount=amount;it.note=note;} }
   else list.push({id:'f'+Date.now(),name,amount,note});
-  save('vn_'+finMode,finMode==='income'?income:expense);
-  closeModal('modal-fin'); renderSettings(); renderHome();
+  save(); closeModal('modal-fin'); renderSettings(); renderHome();
   showToast(editFinId?'✓ Đã cập nhật':'✓ Đã thêm');
 }
 function deleteFin(){
   if(!editFinId||!confirm('Xoá khoản này?'))return;
   if(finMode==='income') income=income.filter(x=>x.id!==editFinId);
   else expense=expense.filter(x=>x.id!==editFinId);
-  save('vn_'+finMode,finMode==='income'?income:expense);
-  closeModal('modal-fin'); renderSettings(); renderHome();
+  save(); closeModal('modal-fin'); renderSettings(); renderHome();
   showToast('🗑 Đã xoá');
 }
 
-// ── MONTH PICKER ──────────────────────────────────────────────────────────────
+// ── MONTH PICKER ──────────────────────────────────────────────
 function openMonthPicker(){
   const yr=currentMonth.split('-')[0];
   document.getElementById('mp-title').textContent=`Chọn tháng — ${yr}`;
@@ -700,7 +984,7 @@ function openMonthPicker(){
   document.getElementById('modal-month').classList.add('open');
 }
 
-// ── UTILS ─────────────────────────────────────────────────────────────────────
+// ── UTILS ─────────────────────────────────────────────────────
 function closeModal(id){ document.getElementById(id).classList.remove('open'); }
 function closeMBg(id,e){ if(e.target===document.getElementById(id)) closeModal(id); }
 
@@ -717,17 +1001,13 @@ function switchPage(name){
 function resetAll(){
   if(!confirm('Reset toàn bộ về mặc định?'))return;
   debts=clone(DEF_DEBTS); income=clone(DEF_INCOME); expense=clone(DEF_EXPENSE); ticks={};
-  save('vn_debts',debts); save('vn_income',income); save('vn_expense',expense); save('vn_ticks',ticks);
-  renderSettings(); renderHome(); showToast('✓ Đã reset');
+  save(); renderSettings(); renderHome(); showToast('✓ Đã reset');
 }
 
 function showToast(msg){
   const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'),2000);
 }
-
-// ── INIT ──────────────────────────────────────────────────────────────────────
-load(); initMonth(); renderHome();
 </script>
 </body>
 </html>

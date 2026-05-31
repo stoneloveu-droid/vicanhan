@@ -240,6 +240,13 @@ function renderHome(){
   document.getElementById('kpi-remain').style.color    =remain>=0?'var(--purple)':'var(--red)';
   document.getElementById('kpi-debt-total').textContent=fmt(totalDebtLeft);
 
+  const monthTxnsAll=txns[currentMonth]||[];
+  const txnInHome =monthTxnsAll.filter(t=>t.type==='in') .reduce((s,t)=>s+Number(t.amount),0);
+  const txnOutHome=monthTxnsAll.filter(t=>t.type==='out').reduce((s,t)=>s+Number(t.amount),0);
+  const wallet=walletBase+txnInHome-txnOutHome;
+  const wEl=document.getElementById('kpi-wallet');
+  if(wEl){ wEl.textContent=fmt(wallet); wEl.style.color=wallet>=0?'var(--blue)':'var(--red)'; }
+
   // ratio bar
   if(totalIn>0){
     const ep=Math.min(totalOut/totalIn*100,100);
@@ -391,19 +398,17 @@ window.filterTab=function(f,el){
 
 // ── TXN PAGE ───────────────────────────────────────────────────
 function renderTxnPage(){
-  document.getElementById('txn-month-label').textContent=getML(currentMonth);
-  document.getElementById('txn-subtitle').textContent   =getML(currentMonth);
+  const tsl=document.getElementById('txn-subtitle');
+  if(tsl) tsl.textContent=getML(currentMonth);
 
   const monthTxns=txns[currentMonth]||[];
   const txnIn =monthTxns.filter(t=>t.type==='in') .reduce((s,t)=>s+Number(t.amount),0);
   const txnOut=monthTxns.filter(t=>t.type==='out').reduce((s,t)=>s+Number(t.amount),0);
-  const wallet=walletBase+txnIn-txnOut;
 
   document.getElementById('txn-kpi-in').textContent =fmt(txnIn);
   document.getElementById('txn-kpi-out').textContent=fmt(txnOut);
-  document.getElementById('kpi-wallet').textContent =fmt(wallet);
 
-  // wallet input
+  // wallet input sync
   const wi=document.getElementById('wallet-base-input');
   if(wi) wi.value=walletBase||'';
 
@@ -688,10 +693,21 @@ function renderSettings(){
   renderDebtList('tc');
   const sel=document.getElementById('fmt-select');
   if(sel) sel.value=fmtMode;
-  // update debt sub
   const activeCount=debts.filter(d=>!d.settled).length;
   const sub=document.getElementById('acc-debt-sub');
   if(sub) sub.textContent=`${activeCount} khoản đang hoạt động`;
+  // wallet
+  const wi=document.getElementById('wallet-base-input');
+  if(wi) wi.value=walletBase||'';
+  const wsub=document.getElementById('acc-wallet-sub');
+  if(wsub){
+    const monthTxns=txns[currentMonth]||[];
+    const txnIn =monthTxns.filter(t=>t.type==='in') .reduce((s,t)=>s+Number(t.amount),0);
+    const txnOut=monthTxns.filter(t=>t.type==='out').reduce((s,t)=>s+Number(t.amount),0);
+    const wallet=walletBase+txnIn-txnOut;
+    wsub.textContent=`Hiện tại: ${fmt(wallet)}`;
+  }
+  renderSavingList();
 }
 
 window.toggleAcc=function(id){

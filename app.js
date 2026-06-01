@@ -1,33 +1,10 @@
-import { auth, db, doc, onSnapshot, setDoc,
-         GoogleAuthProvider, signInWithPopup, signInAnonymously,
-         onAuthStateChanged, signOut }
+import { auth, db, doc, onSnapshot, setDoc, GoogleAuthProvider, signInWithPopup, signInAnonymously, onAuthStateChanged, signOut }
   from "./firebase.js";
-import { fmt, fmtNoUnit, getML, tcCalc, tcBalance, tcGetMonthly, tcGetDebt }
+import { fmt, fmtNoUnit, fmtInput, getInputVal, setInputFmt, getML, tcCalc, tcBalance, tcGetMonthly, tcGetDebt }
   from "./calc.js";
 
-// ── DOM HELPERS (tách khỏi calc.js) ──────────────────────────
-function fmtInput(el){
-  const raw=el.value.replace(/\./g,'').replace(/[^0-9]/g,'');
-  const num=parseInt(raw)||0;
-  el.value=num?fmtNoUnit(num):'';
-  el.dataset.raw=String(num);
-}
-function getInputVal(id){
-  const el=document.getElementById(id);
-  if(!el) return 0;
-  if(el.dataset.raw!==undefined&&el.dataset.raw!=='') return Number(el.dataset.raw);
-  return Number(el.value.replace(/\./g,''))||0;
-}
-function setInputFmt(id,val){
-  const el=document.getElementById(id);if(!el)return;
-  const n=Math.round(Number(val)||0);
-  el.value=n?fmtNoUnit(n):'';
-  el.dataset.raw=String(n);
-}
-// Expose cho oninput trong HTML
-window.fmtInput   = fmtInput;
-window.calcTcFields = calcTcFields;
-window.calcTdFields = calcTdFields;
+// ── EXPOSE helpers cần gọi từ HTML ───────────────────────────
+window.fmtInput = fmtInput;
 
 // ── DEFAULTS ─────────────────────────────────────────────────
 const DEF_DEBTS = [
@@ -54,8 +31,6 @@ let editDebtId=null, editFinId=null, finMode='income';
 let editTxnId=null, txnType='out';
 let uid=null, unsubSnap=null;
 let currentTheme='dark';
-// Flag chặn onSnapshot trigger lại renderAll khi chính mình vừa save
-let isSavingToFirestore=false;
 
 function clone(x){return JSON.parse(JSON.stringify(x));}
 function initMonth(){
@@ -69,11 +44,7 @@ function userDoc(){return doc(db,'users',uid);}
 function startRealtimeSync(){
   if(unsubSnap) unsubSnap();
   unsubSnap = onSnapshot(userDoc(), (snap)=>{
-    // Nếu đang trong quá trình save của chính mình → bỏ qua để tránh double-render
-    if(isSavingToFirestore) return;
-
     if(!snap.exists()){
-      // User mới: ghi dữ liệu mặc định
       debts=clone(DEF_DEBTS); income=clone(DEF_INCOME); expense=clone(DEF_EXPENSE);
       ticks={}; txns={}; savings=[]; walletBase=0; lastAutoMonth='';
       saveToFirestore();
@@ -96,44 +67,34 @@ function startRealtimeSync(){
 
 async function saveToFirestore(){
   if(!uid) return;
-  isSavingToFirestore=true;
   setSyncBadge('syncing','Đang lưu…');
   try{
-    await setDoc(userDoc(),
-      {debts,income,expense,ticks,txns,savings,walletBase,lastAutoMonth},
-      {merge:true}
-    );
+    await setDoc(userDoc(),{debts,income,expense,ticks,txns,savings,walletBase,lastAutoMonth},{merge:true});
     setSyncBadge('synced','Đã đồng bộ');
-  }catch(e){
-    setSyncBadge('error','Lỗi lưu');
-    console.error(e);
-  } finally {
-    // Reset flag sau 1s (đủ để Firestore echo qua onSnapshot bị bỏ qua)
-    setTimeout(()=>{isSavingToFirestore=false;},1000);
-  }
+  }catch(e){setSyncBadge('error','Lỗi lưu');console.error(e);}
 }
 
 function setSyncBadge(cls,txt){
-  const b=document.getElementById('sync-badge');if(b) b.className='sync-badge '+cls;
-  const t=document.getElementById('sync-text');if(t) t.textContent=txt;
+  const b=document.getElementById('sync-badge');
+  if(b) b.className='sync-badge '+cls;
+  const t=document.getElementById('sync-text');
+  if(t) t.textContent=txt;
 }
 
 // ── MIGRATE dữ liệu cũ ────────────────────────────────────────
 function migrateDebts(){
   debts.forEach(d=>{
-    // TC: note dạng "Kỳ X/Y" cũ
     if(d.type==='tc'&&d.note&&!d.rate){
       const m=d.note.match(/^Kỳ\s*(\d+)\/(\d+)$/);
       if(m){d.curTerm=parseInt(m[1]);d.totalTerm=parseInt(m[2]);d.note='';}
     }
-    // TC: nếu có debt cũ nhưng chưa có principal
-    if(d.type==='tc'&&!d.principal&&d.debt) d.principal=d.debt;
-    // TD: migrate debt -> used
+    if(d.type==='tc'&&!d.principal&&d.debt){d.principal=d.debt;}
     if(d.type==='td'&&!d.used&&d.debt){d.used=d.debt;d.limit=d.limit||d.debt*2;}
+    if(d.type==='td'&&!d.monthly&&d.monthly!==0){d.monthly=d.used||0;}
   });
 }
 
-// ── AUTO-REDUCE: chỉ chạy 1 lần / tháng ──────────────────────
+// ── AUTO-REDUCE chỉ chạy 1 lần / tháng ───────────────────────
 function autoReduceDebts(){
   if(!currentMonth||lastAutoMonth===currentMonth) return;
   debts.forEach(d=>{
@@ -142,37 +103,20 @@ function autoReduceDebts(){
       d.curTerm=Math.min((d.curTerm||0)+1, d.totalTerm);
       if(d.curTerm>=d.totalTerm) d.settled=true;
     }
-    // TD: không auto-reduce, user tự cập nhật "đã dùng"
   });
   lastAutoMonth=currentMonth;
   saveToFirestore();
 }
 
 // ── AUTH ──────────────────────────────────────────────────────
-// FIX: signInWithPopup cần user gesture (onclick), không thể gọi async lồng nhau
-window.signInGoogle=function(){
-  const provider=new GoogleAuthProvider();
-  // Thêm prompt để luôn chọn tài khoản, tránh lỗi popup bị block
-  provider.setCustomParameters({prompt:'select_account'});
-  signInWithPopup(auth,provider).catch(e=>{
-    console.error('Google sign-in error:',e.code, e.message);
-    if(e.code==='auth/popup-blocked'){
-      showToast('⚠️ Popup bị chặn — vui lòng cho phép popup từ trang này');
-    } else if(e.code==='auth/cancelled-popup-request'||e.code==='auth/popup-closed-by-user'){
-      // User tự đóng, không cần toast
-    } else {
-      showToast('⚠️ Đăng nhập thất bại: '+e.code);
-    }
-  });
+window.signInGoogle=async()=>{
+  try{const p=new GoogleAuthProvider();await signInWithPopup(auth,p);}
+  catch(e){showToast('⚠️ Đăng nhập thất bại');}
 };
-
-window.signInAnon=function(){
-  signInAnonymously(auth).catch(e=>{
-    console.error('Anon sign-in error:',e.code, e.message);
-    showToast('⚠️ Lỗi kết nối: '+e.code);
-  });
+window.signInAnon=async()=>{
+  try{await signInAnonymously(auth);}
+  catch(e){showToast('⚠️ Lỗi kết nối');}
 };
-
 window.doSignOut=function(){
   confirmAction('Đăng xuất khỏi tài khoản?',async()=>{
     if(unsubSnap){unsubSnap();unsubSnap=null;}
@@ -180,38 +124,41 @@ window.doSignOut=function(){
   });
 };
 
-onAuthStateChanged(auth,(user)=>{
+onAuthStateChanged(auth,async(user)=>{
   const overlay =document.getElementById('loading-overlay');
   const authPage=document.getElementById('auth-page');
   const bnav    =document.getElementById('bnav');
-
   if(user){
     uid=user.uid;
     const name =user.displayName||(user.isAnonymous?'Ẩn danh':'Người dùng');
     const email=user.email||(user.isAnonymous?'Không đăng nhập':'—');
-    // FIX: dùng ?. để không lỗi nếu element chưa render
-    document.getElementById('acc-name')?.setAttribute('data-val',name);
-    document.getElementById('acc-email')?.setAttribute('data-val',email);
-    document.getElementById('acc-name-sub')?.setAttribute('data-val',name);
-    document.getElementById('acc-email-sub')?.setAttribute('data-val',email);
-    // Set text trực tiếp an toàn hơn
-    ['acc-name','acc-email','acc-name-sub','acc-email-sub'].forEach(id=>{
-      const el=document.getElementById(id);
-      if(el) el.textContent=(id.includes('email')?email:name);
-    });
-
+    // Sync tất cả các element hiển thị tên/email
+    ['acc-name','acc-name2'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=name;});
+    ['acc-email','acc-email-sub'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=email;});
+    // Avatar: hiển thị 2 chữ cái đầu nếu đăng nhập Google
+    const _setAvatar=(id)=>{
+      const el=document.getElementById(id);if(!el)return;
+      if(!user.isAnonymous&&user.displayName){
+        const ini=user.displayName.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+        el.dataset.initials=ini;el.classList.add('has-initials');el.textContent='';
+      } else {
+        el.textContent='👤';el.classList.remove('has-initials');delete el.dataset.initials;
+      }
+    };
+    _setAvatar('sett-avatar-emoji');_setAvatar('sett-dd-avatar');
     authPage.classList.remove('active');
     bnav.style.display='flex';
     initMonth();
     setSyncBadge('syncing','Đang đồng bộ…');
     startRealtimeSync();
-    // Ẩn loading overlay
-    if(overlay){overlay.classList.add('hidden');setTimeout(()=>overlay.style.display='none',500);}
+    overlay.classList.add('hidden');
+    setTimeout(()=>overlay.style.display='none',500);
     switchPage('home');
   } else {
     uid=null;
     if(unsubSnap){unsubSnap();unsubSnap=null;}
-    if(overlay){overlay.classList.add('hidden');setTimeout(()=>overlay.style.display='none',500);}
+    overlay.classList.add('hidden');
+    setTimeout(()=>overlay.style.display='none',500);
     bnav.style.display='none';
     document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
     authPage.classList.add('active');
@@ -223,13 +170,16 @@ window.setTheme=function(t){
   currentTheme=t;
   document.documentElement.setAttribute('data-theme',t);
   localStorage.setItem('vn_theme',t);
-  ['dark','light','amoled'].forEach(th=>document.getElementById('tp-'+th)?.classList.toggle('active',th===t));
+  ['dark','light','amoled'].forEach(th=>{
+    document.getElementById('tp-'+th)?.classList.toggle('active',th===t);
+  });
   const names={dark:'Dark 🌑',light:'Light ☀️',amoled:'AMOLED ⚫'};
-  const sub=document.getElementById('theme-sub');if(sub) sub.textContent=names[t]||t;
+  const sub=document.getElementById('theme-sub');
+  if(sub) sub.textContent=names[t]||t;
 };
 function initTheme(){
   const saved=localStorage.getItem('vn_theme')||'dark';
-  window.setTheme(saved);
+  setTheme(saved);
 }
 
 // ── RENDER ALL ────────────────────────────────────────────────
@@ -247,11 +197,14 @@ function renderHome(){
   const n=new Date();
   const sd=document.getElementById('sub-date');
   if(sd) sd.textContent=n.toLocaleDateString('vi-VN',{weekday:'long',day:'numeric',month:'numeric'});
-  const ml=document.getElementById('month-label');if(ml) ml.textContent=getML(currentMonth);
+  const ml=document.getElementById('month-label');
+  if(ml) ml.textContent=getML(currentMonth);
 
   const totalIncome =income.reduce((s,x)=>s+Number(x.amount),0);
   const totalExpense=expense.reduce((s,x)=>s+Number(x.amount),0);
-  const totalDebtPay=debts.filter(d=>!d.settled).reduce((s,d)=>s+(d.type==='tc'?tcGetMonthly(d):Number(d.monthly||0)),0);
+  const totalDebtPay=debts.filter(d=>!d.settled).reduce((s,d)=>{
+    return s+(d.type==='tc'?tcGetMonthly(d):Number(d.monthly||0));
+  },0);
 
   const monthTxns=txns[currentMonth]||[];
   const txnIn =monthTxns.filter(t=>t.type==='in').reduce((s,t)=>s+Number(t.amount),0);
@@ -259,18 +212,24 @@ function renderHome(){
   const totalIn =totalIncome+txnIn;
   const totalOut=totalExpense+txnOut;
   const remain  =totalIn-totalOut-totalDebtPay;
-  const totalDebtLeft=debts.filter(d=>!d.settled).reduce((s,d)=>s+(d.type==='tc'?tcGetDebt(d):Number(d.used||0)),0);
+  const totalDebtLeft=debts.filter(d=>!d.settled).reduce((s,d)=>{
+    return s+(d.type==='tc'?tcGetDebt(d):Number(d.used||0));
+  },0);
 
   const el=id=>document.getElementById(id);
-  if(el('kpi-income'))    el('kpi-income').textContent=fmt(totalIn);
-  if(el('kpi-expense'))   el('kpi-expense').textContent=fmt(totalOut);
-  if(el('kpi-debt-pay'))  el('kpi-debt-pay').textContent=fmt(totalDebtPay);
-  if(el('kpi-remain')){   el('kpi-remain').textContent=remain>=0?fmt(remain):'-'+fmt(Math.abs(remain));
-                          el('kpi-remain').style.color=remain>=0?'var(--purple)':'var(--red)';}
+  if(el('kpi-income'))   el('kpi-income').textContent=fmt(totalIn);
+  if(el('kpi-expense'))  el('kpi-expense').textContent=fmt(totalOut);
+  if(el('kpi-debt-pay')) el('kpi-debt-pay').textContent=fmt(totalDebtPay);
+  if(el('kpi-remain')){
+    el('kpi-remain').textContent=remain>=0?fmt(remain):'-'+fmt(Math.abs(remain));
+    el('kpi-remain').style.color=remain>=0?'var(--purple)':'var(--red)';
+  }
   if(el('kpi-debt-total')) el('kpi-debt-total').textContent=fmt(totalDebtLeft);
   const wallet=walletBase+txnIn-txnOut;
-  if(el('kpi-wallet')){   el('kpi-wallet').textContent=fmt(wallet);
-                          el('kpi-wallet').style.color=wallet>=0?'var(--blue)':'var(--red)';}
+  if(el('kpi-wallet')){
+    el('kpi-wallet').textContent=fmt(wallet);
+    el('kpi-wallet').style.color=wallet>=0?'var(--blue)':'var(--red)';
+  }
 
   if(totalIn>0){
     const ep=Math.min(totalOut/totalIn*100,100);
@@ -290,12 +249,16 @@ function renderHome(){
 
 // ── PAID ──────────────────────────────────────────────────────
 function renderPaid(){
-  const ml=document.getElementById('paid-month-label');if(ml) ml.textContent=getML(currentMonth);
-  const ps=document.getElementById('paid-subtitle');if(ps) ps.textContent=getML(currentMonth);
+  const pml=document.getElementById('paid-month-label');
+  if(pml) pml.textContent=getML(currentMonth);
+  const ps=document.getElementById('paid-subtitle');
+  if(ps) ps.textContent=getML(currentMonth);
+
   const ms=ticks[currentMonth]||{};
-  const active=debts.filter(d=>!d.settled);
-  const totalPay=active.reduce((s,d)=>s+(d.type==='tc'?tcGetMonthly(d):Number(d.monthly||0)),0);
-  const paidAmt =active.filter(d=>ms[d.id]).reduce((s,d)=>s+(d.type==='tc'?tcGetMonthly(d):Number(d.monthly||0)),0);
+  const activeDebts=debts.filter(d=>!d.settled);
+  const totalPay=activeDebts.reduce((s,d)=>s+(d.type==='tc'?tcGetMonthly(d):Number(d.monthly||0)),0);
+  const paidAmt =activeDebts.filter(d=>ms[d.id]).reduce((s,d)=>s+(d.type==='tc'?tcGetMonthly(d):Number(d.monthly||0)),0);
+
   const el=id=>document.getElementById(id);
   if(el('ps-total-debt')) el('ps-total-debt').textContent=fmt(totalPay);
   if(el('ps-paid'))       el('ps-paid').textContent=fmt(paidAmt);
@@ -304,7 +267,8 @@ function renderPaid(){
 }
 
 function renderCards(){
-  const list=document.getElementById('card-list');if(!list)return;
+  const list=document.getElementById('card-list');
+  if(!list) return;
   list.innerHTML='';
   const ms=ticks[currentMonth]||{};
   let show=debts;
@@ -336,16 +300,21 @@ function debtMeta(d){
 function addCard(wrap,d,ms){
   const paid=!!ms[d.id], settled=!!d.settled;
   const monthly=d.type==='tc'?tcGetMonthly(d):Number(d.monthly||0);
-  const pct=d.type==='tc'&&d.totalTerm?Math.round((d.curTerm||0)/d.totalTerm*100):null;
+  const debt   =d.type==='tc'?tcGetDebt(d)   :Number(d.used||0);
+  const pct    =d.type==='tc'&&d.totalTerm?Math.round((d.curTerm||0)/d.totalTerm*100):null;
+
+  const div=document.createElement('div');
+  div.className='dcard'+(paid?' paid':'')+(settled?' settled':'');
+  div.id='dc-'+d.id;
 
   let detailHTML='';
   if(d.type==='td'){
-    const limit   =Number(d.limit||0);
-    const used    =Number(d.used||0);
-    const avail   =Math.max(0,limit-used);
-    const usedPct =limit?Math.round(used/limit*100):0;
-    const barColor=usedPct>80?'var(--red)':usedPct>50?'var(--orange)':'var(--accent)';
-    const settleFee=Number(d.settleFee||0);
+    const limit      =Number(d.limit||0);
+    const used       =Number(d.used||0);
+    const avail      =Math.max(0,limit-used);
+    const usedPct    =limit?Math.round(used/limit*100):0;
+    const barColor   =usedPct>80?'var(--red)':usedPct>50?'var(--orange)':'var(--accent)';
+    const settleFee  =Number(d.settleFee||0);
     detailHTML=`
       <div class="dd-inner">
         <div class="dd-i"><label>Hạn mức</label><p>${fmt(limit)}</p></div>
@@ -374,9 +343,6 @@ function addCard(wrap,d,ms){
       </div>`;
   }
 
-  const div=document.createElement('div');
-  div.className='dcard'+(paid?' paid':'')+(settled?' settled':'');
-  div.id='dc-'+d.id;
   div.innerHTML=`
     <div class="dcard-top" onclick="tapTop('${d.id}')">
       <div class="d-dot ${paid?'ok':d.type}"></div>
@@ -449,7 +415,7 @@ function renderTxnPage(){
   if(el('txn-kpi-in'))  el('txn-kpi-in').textContent=fmt(txnIn);
   if(el('txn-kpi-out')) el('txn-kpi-out').textContent=fmt(txnOut);
   const wi=el('wallet-base-input');
-  if(wi){wi.value=walletBase?fmtNoUnit(walletBase):'';wi.dataset.raw=String(walletBase);}
+  if(wi){wi.value=walletBase?fmtNoUnit(walletBase):'';wi.dataset.raw=walletBase;}
   const list=el('txn-list');
   if(list){
     list.innerHTML='';
@@ -574,8 +540,7 @@ window.toggleTool=function(id){
   if(!isOpen){body.classList.add('open');arrow.classList.add('open');}
 };
 window.calcInterest=function(){
-  const P=getInputVal('ti-principal');
-  const r=Number(document.getElementById('ti-rate').value)/100||0;
+  const P=getInputVal('ti-principal');const r=Number(document.getElementById('ti-rate').value)/100||0;
   const n=Number(document.getElementById('ti-terms').value)||0;
   const res=document.getElementById('ti-result');
   if(!P||!r||!n){showToast('⚠️ Nhập đủ thông tin');return;}
@@ -588,8 +553,7 @@ window.calcInterest=function(){
     <div class="tr-row"><span class="tr-label">Vốn gốc</span><span class="tr-val">${fmt(P)}</span></div>`;
 };
 window.calcSaving=function(){
-  const goal=getInputVal('sc-goal');
-  const rYear=Number(document.getElementById('sc-rate').value)/100||0;
+  const goal=getInputVal('sc-goal');const rYear=Number(document.getElementById('sc-rate').value)/100||0;
   const months=Number(document.getElementById('sc-months').value)||0;
   const res=document.getElementById('sc-result');
   if(!goal||!months){showToast('⚠️ Nhập đủ thông tin');return;}
@@ -633,12 +597,10 @@ function renderAnalyze(){
   const scoreColor=score>=80?'var(--accent)':score>=60?'var(--orange)':'var(--red)';
   const scoreLabel=score>=80?'Tốt 🟢':score>=60?'Cần cải thiện 🟡':'Rủi ro cao 🔴';
   let payoffItems='';
-  debts.filter(d=>!d.settled&&d.type==='tc'&&d.totalTerm)
-    .sort((a,b)=>(a.totalTerm-(a.curTerm||0))-(b.totalTerm-(b.curTerm||0)))
-    .slice(0,3).forEach(d=>{
-      const rem=d.totalTerm-(d.curTerm||0);const nd=new Date();nd.setMonth(nd.getMonth()+rem);
-      payoffItems+=`<div class="analyze-item"><span class="analyze-key">${d.name}</span><span class="analyze-val" style="font-size:12px">${nd.toLocaleDateString('vi-VN',{month:'numeric',year:'numeric'})} (còn ${rem} kỳ)</span></div>`;
-    });
+  debts.filter(d=>!d.settled&&d.type==='tc'&&d.totalTerm).sort((a,b)=>(a.totalTerm-(a.curTerm||0))-(b.totalTerm-(b.curTerm||0))).slice(0,3).forEach(d=>{
+    const rem=d.totalTerm-(d.curTerm||0);const nd=new Date();nd.setMonth(nd.getMonth()+rem);
+    payoffItems+=`<div class="analyze-item"><span class="analyze-key">${d.name}</span><span class="analyze-val" style="font-size:12px">${nd.toLocaleDateString('vi-VN',{month:'numeric',year:'numeric'})} (còn ${rem} kỳ)</span></div>`;
+  });
   el.innerHTML=`<div class="analyze-score"><div class="analyze-score-num" style="color:${scoreColor}">${score}</div>
     <div class="analyze-score-label">Điểm sức khoẻ tài chính · ${scoreLabel}</div></div>
     <div class="analyze-item"><span class="analyze-key">Tỉ lệ nợ / thu nhập</span><span class="analyze-val" style="color:${debtRatio>40?'var(--red)':'var(--accent)'}">${debtRatio}%</span></div>
@@ -657,7 +619,7 @@ function renderSettings(){
   const sub=document.getElementById('acc-debt-sub');
   if(sub) sub.textContent=`${activeCount} khoản đang hoạt động`;
   const wi=document.getElementById('wallet-base-input');
-  if(wi){wi.value=walletBase?fmtNoUnit(walletBase):'';wi.dataset.raw=String(walletBase);}
+  if(wi){wi.value=walletBase?fmtNoUnit(walletBase):'';wi.dataset.raw=walletBase;}
   const wsub=document.getElementById('acc-wallet-sub');
   if(wsub){
     const mt=txns[currentMonth]||[];
@@ -666,7 +628,7 @@ function renderSettings(){
     wsub.textContent=`Hiện tại: ${fmt(walletBase+i-o)}`;
   }
   renderSavingList();
-  window.setTheme(currentTheme);
+  setTheme(currentTheme);
 }
 
 window.toggleAcc=function(id){
@@ -692,6 +654,7 @@ function renderFinList(mode){
     el.appendChild(row);
   });
 }
+
 function renderDebtList(type){
   const list=debts.filter(d=>d.type===type);
   const el=document.getElementById('list-'+type);if(!el)return;
@@ -721,11 +684,11 @@ function toggleTcFields(type){
 }
 window.onDebtTypeChange=val=>toggleTcFields(val);
 
-function calcTcFields(){
-  const P    =getInputVal('md-principal');
-  const rate =Number(document.getElementById('md-rate')?.value)||0;
-  const total=Number(document.getElementById('md-totalterm')?.value)||0;
-  const paid =Number(document.getElementById('md-curterm')?.value)||0;
+window.calcTcFields=function(){
+  const P      =getInputVal('md-principal');
+  const rate   =Number(document.getElementById('md-rate')?.value)||0;
+  const total  =Number(document.getElementById('md-totalterm')?.value)||0;
+  const paid   =Number(document.getElementById('md-curterm')?.value)||0;
   const preview=document.getElementById('tc-calc-preview');
   if(!P||!rate||!total){if(preview)preview.style.display='none';return;}
   const {monthly}=tcCalc(P,rate,total);
@@ -740,17 +703,18 @@ function calcTcFields(){
     document.getElementById('tc-calc-interest').textContent=fmt(interest);
     document.getElementById('tc-calc-principal').textContent=fmt(prinPart);
   }
-}
-function calcTdFields(){
+};
+window.calcTdFields=function(){
   const limit=getInputVal('md-limit');
   const used =getInputVal('md-used');
   if(!limit||!used) return;
+  // Tự ước tính trả tối thiểu nếu chưa nhập (2% dư nợ, tối thiểu 50k)
   const monthly=document.getElementById('md-monthly-td');
   if(monthly&&(!monthly.dataset.raw||monthly.dataset.raw==='0')){
     const est=Math.max(50000,Math.round(used*0.02));
     setInputFmt('md-monthly-td',est);
   }
-}
+};
 
 window.openDebtModal=function(type){
   editDebtId=null;
@@ -767,6 +731,7 @@ window.openDebtModal=function(type){
   document.getElementById('modal-debt').classList.add('open');
   setTimeout(()=>document.getElementById('md-name').focus(),350);
 };
+
 window.openDebtEdit=function(id){
   const d=debts.find(x=>x.id===id);if(!d)return;
   editDebtId=id;
@@ -788,12 +753,13 @@ window.openDebtEdit=function(id){
     document.getElementById('md-totalterm').value=d.totalTerm||'';
     document.getElementById('md-curterm').value=d.curTerm||'';
     document.getElementById('md-note-tc').value=d.note||'';
-    setTimeout(calcTcFields,100);
+    setTimeout(window.calcTcFields,100);
   }
   toggleTcFields(d.type);
   document.getElementById('modal-debt').classList.add('open');
 };
 window.confirmDelDebt=id=>window.openDebtEdit(id);
+
 window.saveDebt=async function(){
   const name   =document.getElementById('md-name').value.trim();
   const type   =document.getElementById('md-type').value;
@@ -809,12 +775,12 @@ window.saveDebt=async function(){
     if(!monthly){showToast('⚠️ Nhập trả tối thiểu/tháng');return;}
     obj={...obj,limit,used,monthly,settleFee,note};
   } else {
-    const principal   =getInputVal('md-principal');
-    const rate        =Number(document.getElementById('md-rate').value)||0;
-    const totalTerm   =Number(document.getElementById('md-totalterm').value)||0;
-    const curTerm     =Number(document.getElementById('md-curterm').value)||0;
+    const principal=getInputVal('md-principal');
+    const rate     =Number(document.getElementById('md-rate').value)||0;
+    const totalTerm=Number(document.getElementById('md-totalterm').value)||0;
+    const curTerm  =Number(document.getElementById('md-curterm').value)||0;
     const disburseDate=document.getElementById('md-disburse').value||'';
-    const note        =document.getElementById('md-note-tc').value.trim();
+    const note     =document.getElementById('md-note-tc').value.trim();
     if(!principal||!rate||!totalTerm){showToast('⚠️ Nhập đủ vốn gốc, lãi suất, số kỳ');return;}
     const settled=curTerm>=totalTerm&&totalTerm>0;
     obj={...obj,principal,rate,totalTerm,curTerm,disburseDate,note,settled};
@@ -877,7 +843,7 @@ window.deleteFin=function(){
 };
 
 // ── MONTH PICKER ──────────────────────────────────────────────
-window.pickerYear=new Date().getFullYear();
+window.pickerYear = new Date().getFullYear();
 window.openMonthPicker=function(){
   window.pickerYear=parseInt(currentMonth.split('-')[0]);
   renderMonthPicker();
@@ -927,11 +893,10 @@ window.resetAll=function(){
   });
 };
 function showToast(msg){
-  const t=document.getElementById('toast');if(!t)return;
-  t.textContent=msg;t.classList.add('show');
+  const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'),2200);
 }
-function confirmAction(msg,onOk){
+function confirmAction(msg, onOk){
   const overlay=document.createElement('div');
   overlay.style='position:fixed;inset:0;background:rgba(0,0,0,.72);backdrop-filter:blur(14px);z-index:500;display:flex;align-items:flex-end;justify-content:center';
   overlay.innerHTML=`<div style="background:var(--card2);border:1px solid var(--border);border-radius:28px 28px 0 0;width:100%;max-width:430px;padding:24px 20px calc(env(safe-area-inset-bottom,0px)+24px)">
@@ -946,6 +911,23 @@ function confirmAction(msg,onOk){
   overlay.querySelector('#ca-ok').onclick=()=>{overlay.remove();onOk();};
 }
 
+
+// ── SETTINGS DROPDOWN ─────────────────────────────────────────
+window.toggleSettMenu=function(){
+  const menu=document.getElementById('sett-menu');
+  const overlay=document.getElementById('sett-dd-overlay');
+  const btn=document.getElementById('sett-more-btn');
+  if(!menu) return;
+  const isOpen=menu.classList.contains('open');
+  menu.classList.toggle('open',!isOpen);
+  if(overlay) overlay.classList.toggle('open',!isOpen);
+  if(btn) btn.classList.toggle('active',!isOpen);
+};
+window.openThemeSheet=function(){
+  closeModal('modal-theme');
+  // Small delay so dropdown closes first
+  setTimeout(()=>document.getElementById('modal-theme')?.classList.add('open'),50);
+};
 // ── INIT ──────────────────────────────────────────────────────
 initMonth();
 initTheme();

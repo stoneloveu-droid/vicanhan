@@ -167,22 +167,47 @@
 
 <!-- PAGE: SETTINGS -->
 <div class="page" id="page-settings"><div class="scroll">
-  <div class="top-bar" style="padding-bottom:8px">
-    <div><h1>⚙️ Cài đặt</h1><p id="acc-email-sub">—</p></div>
-    <div class="sett-menu-wrap">
-      <div class="sett-avatar" id="sett-avatar" onclick="toggleSettMenu()">👤</div>
-      <div class="sett-menu" id="sett-menu">
-        <div class="sett-menu-user">
-          <div class="s-name" id="acc-name">—</div>
-          <div class="s-val" id="acc-email">—</div>
-        </div>
-        <div class="sett-menu-sep"></div>
-        <div class="sett-menu-item" onclick="openThemeSheet();toggleSettMenu()">🎨 Giao diện</div>
-        <div class="sett-menu-sep"></div>
-        <div class="sett-menu-item danger" onclick="resetAll();toggleSettMenu()">🗑️ Xoá & reset dữ liệu</div>
-        <div class="sett-menu-item danger" onclick="doSignOut();toggleSettMenu()">🚪 Đăng xuất</div>
+  <div class="sett-header">
+    <div class="sett-header-left">
+      <div class="sett-header-avatar" id="sett-avatar-btn" onclick="toggleSettMenu()">
+        <span id="sett-avatar-emoji">👤</span>
+      </div>
+      <div class="sett-header-info">
+        <div class="sett-header-name" id="acc-name">—</div>
+        <div class="sett-header-email" id="acc-email-sub">—</div>
       </div>
     </div>
+    <!-- Dropdown trigger -->
+    <div class="sett-more-btn" id="sett-more-btn" onclick="toggleSettMenu()">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="5" r="1.2" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none"/><circle cx="12" cy="19" r="1.2" fill="currentColor" stroke="none"/></svg>
+    </div>
+    <!-- Dropdown menu -->
+    <div class="sett-dropdown" id="sett-menu">
+      <div class="sett-dd-user">
+        <div class="sett-dd-avatar" id="sett-dd-avatar">👤</div>
+        <div>
+          <div class="sett-dd-name" id="acc-name2">—</div>
+          <div class="sett-dd-email" id="acc-email">—</div>
+        </div>
+      </div>
+      <div class="sett-dd-sep"></div>
+      <div class="sett-dd-item" onclick="openThemeSheet();toggleSettMenu()">
+        <div class="sett-dd-ico" style="background:rgba(197,123,255,.12)">🎨</div>
+        <span>Giao diện</span>
+        <svg class="sett-dd-chev" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+      </div>
+      <div class="sett-dd-sep"></div>
+      <div class="sett-dd-item danger" onclick="resetAll();toggleSettMenu()">
+        <div class="sett-dd-ico" style="background:rgba(255,87,87,.12)">🗑️</div>
+        <span>Xoá & reset dữ liệu</span>
+      </div>
+      <div class="sett-dd-item danger" onclick="doSignOut();toggleSettMenu()">
+        <div class="sett-dd-ico" style="background:rgba(255,87,87,.12)">🚪</div>
+        <span>Đăng xuất</span>
+      </div>
+    </div>
+    <!-- Overlay để đóng dropdown khi click ngoài -->
+    <div class="sett-dd-overlay" id="sett-dd-overlay" onclick="toggleSettMenu()"></div>
   </div>
 
   <!-- Số dư & Tiết kiệm -->

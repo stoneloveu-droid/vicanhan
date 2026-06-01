@@ -4,13 +4,15 @@ import { getAuth, GoogleAuthProvider, signInWithPopup, signInAnonymously, onAuth
 import { getFirestore, doc, onSnapshot, setDoc }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-// ── FIREBASE CONFIG ──────────────────────────────────────────
-// ⚠️  BẢO MẬT: API key này PUBLIC — bắt buộc phải:
-//   1. Vào Firebase Console > Project Settings > API key > HTTP referrers
-//      → Chỉ cho phép domain của bạn (VD: vicuatoi.web.app)
-//   2. Firestore Security Rules phải đặt: chỉ user đã auth mới đọc/ghi được data của họ
-//      → rules_version = '2'; service cloud.firestore { match /databases/{db}/documents {
-//           match /users/{uid} { allow read, write: if request.auth.uid == uid; } } }
+// ⚠️  BẢO MẬT: Sau khi deploy, vào Firebase Console:
+//   1. Project Settings > API key > HTTP referrers → chỉ cho phép domain của bạn
+//   2. Firestore Security Rules:
+//      rules_version = '2';
+//      service cloud.firestore {
+//        match /databases/{database}/documents {
+//          match /users/{uid} { allow read, write: if request.auth != null && request.auth.uid == uid; }
+//        }
+//      }
 const firebaseConfig = {
   apiKey: "AIzaSyA1Pde18_aLXilbvs1Q0fWbVtcApkAdJcs",
   authDomain: "vicuatoi.firebaseapp.com",
@@ -24,5 +26,4 @@ const fbApp = initializeApp(firebaseConfig);
 const auth  = getAuth(fbApp);
 const db    = getFirestore(fbApp);
 
-// ── EXPORTS ───────────────────────────────────────────────────
 export { auth, db, doc, onSnapshot, setDoc, GoogleAuthProvider, signInWithPopup, signInAnonymously, onAuthStateChanged, signOut };

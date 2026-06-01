@@ -323,6 +323,8 @@ html,body{
 }
 [data-theme="light"] .bnav{background:rgba(244,244,248,.97)}
 [data-theme="amoled"] .bnav{background:rgba(0,0,0,.99)}
+/* Fix: ni active icon stroke cho amoled */
+[data-theme="amoled"] .ni.active .ni-icon svg{stroke:#000000}
 .ni{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;padding:0 2px}
 .ni:active{opacity:.6}
 .ni-icon{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;transition:all .2s cubic-bezier(.4,0,.2,1)}
@@ -375,6 +377,7 @@ html,body{
   padding:6px 20px calc(var(--safe-b)+28px);width:100%;max-width:430px}
 .mptitle{font-size:16px;font-weight:900;text-align:center;margin:12px 0 16px}
 .mpgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.mpgrid > div:first-child{grid-column:1/-1}
 .mpbtn{padding:13px 0;border-radius:14px;border:1px solid var(--border);background:var(--card);
   color:var(--sub);font-family:'Mulish',sans-serif;font-size:13px;font-weight:800;cursor:pointer;text-align:center;transition:all .2s}
 .mpbtn.active{background:var(--accent);border-color:var(--accent);color:#0A0A0F}

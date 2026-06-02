@@ -1,8 +1,6 @@
 import { auth, db, doc, onSnapshot, setDoc, GoogleAuthProvider, signInWithPopup, signInAnonymously, onAuthStateChanged, signOut }
   from "./firebase.js";
-import { fmt, fmtNoUnit, getML,
-  tcCurrentPayment, tcBalance, tcGetMonthly, tcGetDebt,
-  tcTotalInterest, tcScheduleTable, migrateRate }
+import { fmt, fmtNoUnit, getML, tcCurrentPayment, tcBalance, tcGetMonthly, tcGetDebt, tcTotalInterest, tcScheduleTable, migrateRate }
   from "./calc.js";
 
 
@@ -120,10 +118,6 @@ function migrateDebts(){
     if(d.type==='tc'&&!d.principal&&d.debt){d.principal=d.debt;}
     if(d.type==='td'&&!d.used&&d.debt){d.used=d.debt;d.limit=d.limit||d.debt*2;}
     if(d.type==='td'&&!d.monthly&&d.monthly!==0){d.monthly=d.used||0;}
-    // Migrate rate %/tháng → %/năm (rate cũ ≤ 5 thì là %/tháng)
-    if(d.type==='tc') migrateRate(d);
-    // Default method
-    if(d.type==='tc'&&!d.method) d.method='reducing_balance';
   });
 }
 
@@ -375,15 +369,17 @@ function addCard(wrap,d,ms){
         <div class="credit-bar-track"><div class="credit-bar-fill" style="width:${usedPct}%;background:${barColor}"></div></div>
       </div>`;
   } else {
-    const cp       = tcCurrentPayment(d);
-    const balance  = cp.balance + cp.principal; // dư nợ đầu kỳ hiện tại
+    const balance=tcGetDebt(d);
+    const r=Number(d.rate||0)/100;
+    const interestThisMonth=Math.round(balance*r);
+    const principalThisMonth=Math.max(0,monthly-interestThisMonth);
     detailHTML=`
       <div class="dd-inner">
-        <div class="dd-i"><label>Dư nợ còn lại</label><p>${fmt(tcGetDebt(d))}</p></div>
+        <div class="dd-i"><label>Dư nợ còn lại</label><p>${fmt(balance)}</p></div>
         <div class="dd-i"><label>Kỳ</label><p>${pct!==null?`${d.curTerm||0}/${d.totalTerm} (${pct}%)`:'—'}</p></div>
-        <div class="dd-i"><label>Trả tháng này</label><p style="color:var(--blue)">${fmt(cp.monthly)}</p></div>
-        <div class="dd-i"><label>Trong đó lãi</label><p style="color:var(--orange)">${fmt(cp.interest)}</p></div>
-        <div class="dd-i"><label>Trả gốc</label><p style="color:var(--green)">${fmt(cp.principal)}</p></div>
+        <div class="dd-i"><label>Lãi tháng này</label><p style="color:var(--orange)">${fmt(interestThisMonth)}</p></div>
+        <div class="dd-i"><label>Gốc tháng này</label><p style="color:var(--green)">${fmt(principalThisMonth)}</p></div>
+        <div class="dd-i"><label>Nợ gốc</label><p>${fmt(d.principal||0)}</p></div>
         <div class="dd-i"><label>Trạng thái</label><p id="ds-${d.id}" style="color:${settled?'var(--accent)':paid?'var(--accent)':'var(--orange)'}">${settled?'Tất toán ✓':paid?'Đã TT ✓':'Chờ TT'}</p></div>
       </div>`;
   }
@@ -585,63 +581,17 @@ window.toggleTool=function(id){
   if(!isOpen){body.classList.add('open');arrow.classList.add('open');}
 };
 window.calcInterest=function(){
-  const P      = getInputVal('ti-principal');
-  const rYear  = Number(document.getElementById('ti-rate').value)||0;
-  const n      = Number(document.getElementById('ti-terms').value)||0;
-  const method = document.getElementById('ti-method').value||'reducing_balance';
-  const res    = document.getElementById('ti-result');
-  if(!P||!rYear||!n){showToast('⚠️ Nhập đủ thông tin');return;}
-
-  const totalInt = tcTotalInterest(P, rYear, n, method);
-  const totalPay = P + totalInt;
-
-  // Kỳ 1 để hiển thị tiền trả đầu tiên
-  const first = tcPaymentAtTerm(P, rYear, n, method, 1);
-  // Kỳ cuối
-  const last  = tcPaymentAtTerm(P, rYear, n, method, n);
-
-  // Build schedule table (collapse nếu quá 60 kỳ)
-  const rows = tcScheduleTable(P, rYear, n, method);
-  const showAll = n <= 60;
-  const displayRows = showAll ? rows : [...rows.slice(0,3), null, ...rows.slice(-3)];
-
-  let tableHTML = `
-    <div style="overflow-x:auto;margin-top:12px">
-    <table style="width:100%;border-collapse:collapse;font-size:11px;font-family:'Mulish',sans-serif">
-      <thead>
-        <tr style="border-bottom:1px solid var(--border)">
-          <th style="padding:6px 4px;text-align:center;color:var(--sub);font-weight:800">Kỳ</th>
-          <th style="padding:6px 4px;text-align:right;color:var(--sub);font-weight:800">Tiền trả</th>
-          <th style="padding:6px 4px;text-align:right;color:var(--sub);font-weight:800">Gốc</th>
-          <th style="padding:6px 4px;text-align:right;color:var(--sub);font-weight:800">Lãi</th>
-          <th style="padding:6px 4px;text-align:right;color:var(--sub);font-weight:800">Dư nợ</th>
-        </tr>
-      </thead>
-      <tbody>`;
-
-  displayRows.forEach(row=>{
-    if(!row){
-      tableHTML+=`<tr><td colspan="5" style="padding:6px;text-align:center;color:var(--sub)">• • •</td></tr>`;
-      return;
-    }
-    tableHTML+=`<tr style="border-bottom:1px solid rgba(255,255,255,.04)">
-      <td style="padding:6px 4px;text-align:center;font-weight:700">${row.term}</td>
-      <td style="padding:6px 4px;text-align:right;font-weight:800;color:var(--blue)">${fmtNoUnit(row.total)}</td>
-      <td style="padding:6px 4px;text-align:right;font-weight:700;color:var(--green)">${fmtNoUnit(row.principal)}</td>
-      <td style="padding:6px 4px;text-align:right;font-weight:700;color:var(--orange)">${fmtNoUnit(row.interest)}</td>
-      <td style="padding:6px 4px;text-align:right;color:var(--sub)">${fmtNoUnit(row.balance)}</td>
-    </tr>`;
-  });
-  tableHTML += `</tbody></table></div>`;
-
+  const P=getInputVal('ti-principal');const r=Number(document.getElementById('ti-rate').value)/100||0;
+  const n=Number(document.getElementById('ti-terms').value)||0;
+  const res=document.getElementById('ti-result');
+  if(!P||!r||!n){showToast('⚠️ Nhập đủ thông tin');return;}
+  const monthly=P*r*Math.pow(1+r,n)/(Math.pow(1+r,n)-1);
+  const total=monthly*n;const interest=total-P;
   res.className='tool-result show';
-  res.innerHTML=`
-    <div class="tr-row"><span class="tr-label">Trả kỳ 1</span><span class="tr-val" style="color:var(--accent)">${fmt(first.total)}</span></div>
-    ${method==='fixed_principal'?`<div class="tr-row"><span class="tr-label">Trả kỳ cuối</span><span class="tr-val">${fmt(last.total)}</span></div>`:''}
-    <div class="tr-row"><span class="tr-label">Tổng phải trả</span><span class="tr-val">${fmt(totalPay)}</span></div>
-    <div class="tr-row"><span class="tr-label">Tổng lãi</span><span class="tr-val" style="color:var(--red)">${fmt(totalInt)}</span></div>
-    <div class="tr-row"><span class="tr-label">Vốn gốc</span><span class="tr-val">${fmt(P)}</span></div>
-    ${tableHTML}`;
+  res.innerHTML=`<div class="tr-row"><span class="tr-label">Trả mỗi tháng</span><span class="tr-val" style="color:var(--accent)">${fmt(monthly)}</span></div>
+    <div class="tr-row"><span class="tr-label">Tổng trả ${n} kỳ</span><span class="tr-val">${fmt(total)}</span></div>
+    <div class="tr-row"><span class="tr-label">Tổng tiền lãi</span><span class="tr-val" style="color:var(--red)">${fmt(interest)}</span></div>
+    <div class="tr-row"><span class="tr-label">Vốn gốc</span><span class="tr-val">${fmt(P)}</span></div>`;
 };
 window.calcSaving=function(){
   const goal=getInputVal('sc-goal');const rYear=Number(document.getElementById('sc-rate').value)/100||0;
@@ -776,29 +726,23 @@ function toggleTcFields(type){
 window.onDebtTypeChange=val=>toggleTcFields(val);
 
 window.calcTcFields=function calcTcFields(){
-  const P       = getInputVal('md-principal');
-  const rYear   = Number(document.getElementById('md-rate')?.value)||0;
-  const total   = Number(document.getElementById('md-totalterm')?.value)||0;
-  const paid    = Number(document.getElementById('md-curterm')?.value)||0;
-  const method  = document.getElementById('md-method')?.value||'reducing_balance';
-  const preview = document.getElementById('tc-calc-preview');
-  if(!P||!rYear||!total){if(preview)preview.style.display='none';return;}
-
-  // Kỳ hiện tại = paid + 1
-  const curTerm = paid + 1;
-  const dTmp    = {principal:P, rate:rYear, totalTerm:total, method, curTerm:paid};
-  const cp      = tcCurrentPayment(dTmp);
-  const totalInt= tcTotalInterest(P, rYear, total, method);
-  const remain  = tcGetDebt(dTmp);
-
+  const P      =getInputVal('md-principal');
+  const rate   =Number(document.getElementById('md-rate')?.value)||0;
+  const total  =Number(document.getElementById('md-totalterm')?.value)||0;
+  const paid   =Number(document.getElementById('md-curterm')?.value)||0;
+  const preview=document.getElementById('tc-calc-preview');
+  if(!P||!rate||!total){if(preview)preview.style.display='none';return;}
+  const {monthly}=tcCalc(P,rate,total);
+  const remain  =tcBalance(P,rate,total,paid);
+  const r       =rate/100;
+  const interest=Math.round(remain*r);
+  const prinPart=Math.max(0,monthly-interest);
   if(preview){
     preview.style.display='block';
-    document.getElementById('tc-calc-monthly').textContent  = fmt(cp.monthly);
-    document.getElementById('tc-calc-remain').textContent   = fmt(remain);
-    document.getElementById('tc-calc-interest').textContent = fmt(cp.interest);
-    document.getElementById('tc-calc-principal').textContent= fmt(cp.principal);
-    document.getElementById('tc-calc-total-int').textContent= fmt(totalInt);
-    document.getElementById('tc-calc-total-pay').textContent= fmt(P + totalInt);
+    document.getElementById('tc-calc-monthly').textContent=fmt(monthly);
+    document.getElementById('tc-calc-remain').textContent =fmt(remain);
+    document.getElementById('tc-calc-interest').textContent=fmt(interest);
+    document.getElementById('tc-calc-principal').textContent=fmt(prinPart);
   }
 };
 window.calcTdFields=function calcTdFields(){
@@ -845,10 +789,10 @@ window.openDebtEdit=function(id){
     document.getElementById('md-note-td').value=d.note||'';
   } else {
     setInputFmt('md-principal',d.principal||0);
-    document.getElementById('md-rate').value=d.rate||'';       // %/năm
+    document.getElementById('md-disburse').value=d.disburseDate||'';
+    document.getElementById('md-rate').value=d.rate||'';
     document.getElementById('md-totalterm').value=d.totalTerm||'';
     document.getElementById('md-curterm').value=d.curTerm||'';
-    document.getElementById('md-method').value=d.method||'reducing_balance';
     document.getElementById('md-note-tc').value=d.note||'';
     setTimeout(window.calcTcFields,100);
   }
@@ -872,15 +816,15 @@ window.saveDebt=async function(){
     if(!monthly){showToast('⚠️ Nhập trả tối thiểu/tháng');return;}
     obj={...obj,limit,used,monthly,settleFee,note};
   } else {
-    const principal =getInputVal('md-principal');
-    const rate      =Number(document.getElementById('md-rate').value)||0;  // %/năm
-    const totalTerm =Number(document.getElementById('md-totalterm').value)||0;
-    const curTerm   =Number(document.getElementById('md-curterm').value)||0;
-    const method    =document.getElementById('md-method').value||'reducing_balance';
-    const note      =document.getElementById('md-note-tc').value.trim();
+    const principal=getInputVal('md-principal');
+    const rate     =Number(document.getElementById('md-rate').value)||0;
+    const totalTerm=Number(document.getElementById('md-totalterm').value)||0;
+    const curTerm  =Number(document.getElementById('md-curterm').value)||0;
+    const disburseDate=document.getElementById('md-disburse').value||'';
+    const note     =document.getElementById('md-note-tc').value.trim();
     if(!principal||!rate||!totalTerm){showToast('⚠️ Nhập đủ vốn gốc, lãi suất, số kỳ');return;}
     const settled=curTerm>=totalTerm&&totalTerm>0;
-    obj={...obj,principal,rate,totalTerm,curTerm,method,note,settled,rateConverted:true};
+    obj={...obj,principal,rate,totalTerm,curTerm,disburseDate,note,settled};
   }
   if(editDebtId){const d=debts.find(x=>x.id===editDebtId);if(d) Object.assign(d,obj);}
   else debts.push({id:'d'+Date.now(),...obj});
@@ -1033,3 +977,500 @@ window.openThemeSheet=function(){
 // ── INIT ──────────────────────────────────────────────────────
 initMonth();
 initTheme();
+
+// ══════════════════════════════════════════════════════════════
+// NEW UI FUNCTIONS — matching new index.html
+// ══════════════════════════════════════════════════════════════
+
+// Override renderHome to use new circular progress + upcoming card
+const _origRenderHome = renderHome; // keep for reference but we override below
+
+function renderHome(){
+  const el=id=>document.getElementById(id);
+  const n=new Date();
+  if(el('sub-date')) el('sub-date').textContent=n.toLocaleDateString('vi-VN',{weekday:'long',day:'numeric',month:'numeric'});
+  if(el('month-label')) el('month-label').textContent=getML(currentMonth);
+
+  const totalIncome =income.reduce((s,x)=>s+Number(x.amount),0);
+  const totalExpense=expense.reduce((s,x)=>s+Number(x.amount),0);
+  const totalDebtPay=debts.filter(d=>!d.settled).reduce((s,d)=>s+(d.type==='tc'?tcGetMonthly(d):Number(d.monthly||0)),0);
+  const monthTxns=txns[currentMonth]||[];
+  const txnIn =monthTxns.filter(t=>t.type==='in').reduce((s,t)=>s+Number(t.amount),0);
+  const txnOut=monthTxns.filter(t=>t.type==='out').reduce((s,t)=>s+Number(t.amount),0);
+  const totalIn =totalIncome+txnIn;
+  const totalOut=totalExpense+txnOut;
+  const remain  =totalIn-totalOut-totalDebtPay;
+  const totalDebtLeft=debts.filter(d=>!d.settled).reduce((s,d)=>s+(d.type==='tc'?tcGetDebt(d):Number(d.used||0)),0);
+  const wallet=walletBase+txnIn-txnOut;
+
+  if(el('kpi-income'))   el('kpi-income').textContent=fmt(totalIn);
+  if(el('kpi-expense'))  el('kpi-expense').textContent=fmt(totalOut);
+  if(el('kpi-debt-pay')) el('kpi-debt-pay').textContent=fmt(totalDebtPay);
+  if(el('kpi-remain')){
+    el('kpi-remain').textContent=remain>=0?fmt(remain):'-'+fmt(Math.abs(remain));
+    el('kpi-remain').style.color=remain>=0?'var(--purple)':'var(--red)';
+  }
+  if(el('kpi-debt-total')) el('kpi-debt-total').textContent=fmt(totalDebtLeft);
+  if(el('kpi-wallet')) el('kpi-wallet').textContent=walletHidden?'••••••':fmt(wallet);
+
+  // Circular progress
+  const ms=ticks[currentMonth]||{};
+  const paidAmt=debts.filter(d=>!d.settled&&ms[d.id]).reduce((s,d)=>s+(d.type==='tc'?tcGetMonthly(d):Number(d.monthly||0)),0);
+  const pct=totalDebtPay?Math.round(paidAmt/totalDebtPay*100):0;
+  const circumference=201;
+  const offset=circumference-(circumference*pct/100);
+  if(el('circ-fill')) el('circ-fill').style.strokeDashoffset=offset;
+  if(el('prog-pct'))  el('prog-pct').textContent=pct+'%';
+  if(el('prog-paid-amt'))  el('prog-paid-amt').textContent=fmt(paidAmt);
+  if(el('prog-total-amt')) el('prog-total-amt').textContent=fmt(totalDebtPay);
+
+  // Upcoming payments (within 7 days)
+  const today=new Date().getDate();
+  const upcoming=debts.filter(d=>!d.settled&&d.payDay&&(d.payDay>=today&&d.payDay<=today+7));
+  if(el('upcoming-badge')) el('upcoming-badge').textContent=upcoming.length;
+  if(el('upcoming-sub')){
+    if(upcoming.length){
+      const names=upcoming.map(d=>d.name).join(', ');
+      el('upcoming-sub').textContent=`${upcoming.length} khoản nợ trong 7 ngày tới`;
+    } else {
+      el('upcoming-sub').textContent='Không có khoản nào sắp đến hạn';
+    }
+  }
+  if(el('upcoming-card')) el('upcoming-card').style.display=upcoming.length?'flex':'none';
+}
+
+// Override renderPaid with new badge counts + progress bar
+const _origRenderPaid = renderPaid;
+function renderPaid(){
+  const el=id=>document.getElementById(id);
+  if(el('paid-month-label')) el('paid-month-label').textContent=getML(currentMonth);
+
+  const ms=ticks[currentMonth]||{};
+  const activeDebts=debts.filter(d=>!d.settled);
+  const totalPay=activeDebts.reduce((s,d)=>s+(d.type==='tc'?tcGetMonthly(d):Number(d.monthly||0)),0);
+  const paidAmt =activeDebts.filter(d=>ms[d.id]).reduce((s,d)=>s+(d.type==='tc'?tcGetMonthly(d):Number(d.monthly||0)),0);
+  const pct=totalPay?Math.round(paidAmt/totalPay*100):0;
+
+  if(el('ps-total-debt')) el('ps-total-debt').textContent=fmt(totalPay);
+  if(el('ps-paid'))       el('ps-paid').textContent=fmt(paidAmt);
+  if(el('debt-prog-fill')) el('debt-prog-fill').style.width=pct+'%';
+  if(el('debt-prog-pct'))  el('debt-prog-pct').textContent=pct+'%';
+
+  // Badge counts
+  const unpaidCount=activeDebts.filter(d=>!ms[d.id]).length;
+  const paidCount  =activeDebts.filter(d=>ms[d.id]).length;
+  if(el('badge-unpaid')) el('badge-unpaid').textContent=unpaidCount;
+  if(el('badge-paid2'))  el('badge-paid2').textContent=paidCount;
+
+  renderCards();
+}
+
+// Override renderCards with new card UI (bank icon, usage bar)
+function renderCards(){
+  const list=document.getElementById('card-list');
+  if(!list) return;
+  list.innerHTML='';
+  const ms=ticks[currentMonth]||{};
+  let show=debts;
+  if(currentFilter==='unpaid') show=debts.filter(d=>!ms[d.id]&&!d.settled);
+  if(currentFilter==='paid2')  show=debts.filter(d=>!!ms[d.id]||d.settled);
+  if(currentFilter==='td')     show=debts.filter(d=>d.type==='td');
+  if(currentFilter==='tc')     show=debts.filter(d=>d.type==='tc');
+  const td=show.filter(d=>d.type==='td');
+  const tc=show.filter(d=>d.type==='tc');
+  if(!show.length){list.innerHTML='<div class="empty">✅ Tất cả đã xong!</div>';return;}
+  const addSection=(title,items)=>{
+    const lbl=document.createElement('div');lbl.className='slabel';lbl.textContent=title;list.appendChild(lbl);
+    const wrap=document.createElement('div');wrap.className='cards-wrap';list.appendChild(wrap);
+    items.forEach(d=>addCard2(wrap,d,ms));
+  };
+  if(td.length) addSection('💳 Thẻ Tín Dụng',td);
+  if(tc.length) addSection('💰 Vay Tín Chấp',tc);
+  list.appendChild(Object.assign(document.createElement('div'),{style:'height:8px'}));
+}
+
+// Bank color map
+const BANK_COLORS={'tp':'#B91C1C','ocb':'#D97706','vp-td':'#0369A1','shin-td':'#7C3AED',
+  'vp-tc':'#0369A1','shin-tc':'#7C3AED','hsbc':'#B91C1C','vib1':'#059669','vib2':'#059669'};
+const BANK_ABBR={'tp':'TP','ocb':'OCB','vp-td':'VP','shin-td':'SH','vp-tc':'VP','shin-tc':'SH','hsbc':'HS','vib1':'VIB','vib2':'VIB'};
+
+function addCard2(wrap,d,ms){
+  const paid=!!ms[d.id], settled=!!d.settled;
+  const monthly=d.type==='tc'?tcGetMonthly(d):Number(d.monthly||0);
+
+  // Bank icon
+  const bg=BANK_COLORS[d.id]||'#374151';
+  const abbr=BANK_ABBR[d.id]||(d.name.slice(0,2).toUpperCase());
+
+  // Subtitle
+  let sub='';
+  if(d.type==='tc'&&d.totalTerm){
+    const cp=tcCurrentPayment(d);
+    const pct=Math.round((d.curTerm||0)/d.totalTerm*100);
+    sub=`Kỳ ${d.curTerm||0}/${d.totalTerm} · ${pct}% · Ngày ${d.payDay||'—'}`;
+  } else {
+    sub=`${d.note||''} · Ngày ${d.payDay||'—'}`;
+  }
+
+  // TD usage bar data
+  let usageBarHTML='';
+  if(d.type==='td'&&d.limit){
+    const used=Number(d.used||0), limit=Number(d.limit);
+    const usedPct=limit?Math.min(100,Math.round(used/limit*100)):0;
+    const barColor=usedPct>80?'var(--red)':usedPct>60?'var(--orange)':'var(--accent)';
+    const settle=Number(d.settleFee||0);
+    usageBarHTML=`<div class="td-usage">
+      <div class="td-usage-track"><div class="td-usage-fill" style="width:${usedPct}%;background:${barColor}"></div></div>
+      <div class="td-usage-labels"><span>Đã dùng ${fmt(used)} (${usedPct}%)</span><span>Còn ${fmt(Math.max(0,limit-used))}</span></div>
+      ${settle?`<div class="td-settle-fee">Phí tất toán: ${fmt(settle)}</div>`:''}
+    </div>`;
+  }
+
+  // Detail grid
+  let detailGrid='';
+  if(d.type==='tc'){
+    const cp=tcCurrentPayment(d);
+    detailGrid=`<div class="dd-grid">
+      <div class="dd-i"><label>Dư nợ</label><p>${fmt(tcGetDebt(d))}</p></div>
+      <div class="dd-i"><label>Lãi/tháng</label><p style="color:var(--orange)">${fmt(cp.interest)}</p></div>
+      <div class="dd-i"><label>Trả gốc</label><p style="color:var(--teal)">${fmt(cp.principal)}</p></div>
+    </div>`;
+  } else {
+    const avail=Math.max(0,(d.limit||0)-(d.used||0));
+    detailGrid=`<div class="dd-grid">
+      <div class="dd-i"><label>Hạn mức</label><p>${fmt(d.limit||0)}</p></div>
+      <div class="dd-i"><label>Đã dùng</label><p style="color:var(--orange)">${fmt(d.used||0)}</p></div>
+      <div class="dd-i"><label>Còn lại</label><p style="color:var(--accent)">${fmt(avail)}</p></div>
+    </div>`;
+  }
+
+  const div=document.createElement('div');
+  div.className='dcard'+(paid?' paid':'')+(settled?' settled':'');
+  div.id='dc-'+d.id;
+  div.innerHTML=`
+    <div class="dcard-top" onclick="tapTop('${d.id}')">
+      <div class="bank-ico" style="background:${bg}">${abbr}</div>
+      <div class="d-info">
+        <div class="d-name">${d.name}${settled?'<span class="settled-tag">Tất toán</span>':''}</div>
+        <div class="d-sub">${sub}</div>
+      </div>
+      <div class="d-right">
+        <div class="d-amt ${d.type}">${fmt(monthly)}</div>
+        <div class="d-unit">/ tháng</div>
+      </div>
+      <button class="chk${paid?' checked':''}" id="cb-${d.id}"
+        onclick="event.stopPropagation();tapCheck('${d.id}')">✓</button>
+    </div>
+    <div class="dcard-detail" id="dd-${d.id}">
+      ${detailGrid}
+      ${usageBarHTML}
+    </div>`;
+  wrap.appendChild(div);
+}
+
+// Override filterTab for new seg2 buttons
+window.filterTab=function(f,el){
+  currentFilter=f; openDetail=null;
+  document.querySelectorAll('.seg2-btn').forEach(b=>b.classList.remove('active'));
+  if(el&&el.classList) el.classList.add('active');
+  renderCards();
+};
+
+// Override renderTxnPage for new layout
+function renderTxnPage(){
+  const el=id=>document.getElementById(id);
+  if(el('txn-month-label')) el('txn-month-label').textContent=getML(currentMonth);
+  const monthTxns=txns[currentMonth]||[];
+  const txnIn =monthTxns.filter(t=>t.type==='in').reduce((s,t)=>s+Number(t.amount),0);
+  const txnOut=monthTxns.filter(t=>t.type==='out').reduce((s,t)=>s+Number(t.amount),0);
+  const txnRemain=txnIn-txnOut;
+  if(el('txn-kpi-in'))  el('txn-kpi-in').textContent=fmt(txnIn);
+  if(el('txn-kpi-out')) el('txn-kpi-out').textContent=fmt(txnOut);
+  if(el('txn-kpi-remain')){
+    el('txn-kpi-remain').textContent=txnRemain>=0?fmt(txnRemain):'-'+fmt(Math.abs(txnRemain));
+    el('txn-kpi-remain').style.color=txnRemain>=0?'var(--teal)':'var(--red)';
+  }
+  const list=el('txn-list');
+  if(list){
+    list.innerHTML='';
+    if(!monthTxns.length){
+      list.innerHTML='<div class="empty" style="padding:20px">Chưa có giao dịch</div>';
+    } else {
+      const show=[...monthTxns].reverse().slice(0,showAllTxnsFlag?9999:8);
+      show.forEach(t=>{
+        const row=document.createElement('div');row.className='txn-row';
+        row.onclick=()=>openTxnEdit(t.id);
+        const ico=txnCatIcon(t.name,t.type);
+        const bg=t.type==='in'?'rgba(76,175,80,.12)':'rgba(255,79,79,.12)';
+        row.innerHTML=`
+          <div class="txn-cat-ico" style="background:${bg}">${ico}</div>
+          <div class="txn-info">
+            <div class="txn-name">${t.name}</div>
+          </div>
+          <div class="txn-amount ${t.type}">${t.type==='in'?'+':'-'}${fmt(t.amount)}</div>`;
+        list.appendChild(row);
+      });
+    }
+  }
+  // wallet base
+  if(el('wallet-base-input')&&!el('wallet-base-input').matches(':focus'))
+    setInputFmt('wallet-base-input',walletBase);
+  renderSavingList();
+}
+
+let showAllTxnsFlag=false;
+window.showAllTxns=()=>{showAllTxnsFlag=true;renderTxnPage();};
+
+function txnCatIcon(name,type){
+  if(type==='in'){
+    if(/lương|salary/i.test(name)) return '💼';
+    if(/thưởng|bonus/i.test(name)) return '🎁';
+    if(/bán/i.test(name)) return '🛒';
+    return '💰';
+  }
+  if(/ăn|food|cơm/i.test(name)) return '🍜';
+  if(/xăng|xe|đi lại|di chuyển/i.test(name)) return '🚗';
+  if(/mua sắm|shop/i.test(name)) return '🛍️';
+  if(/điện|nước|internet/i.test(name)) return '💡';
+  if(/y tế|thuốc|bệnh/i.test(name)) return '💊';
+  if(/giải trí|cafe|nhà hàng/i.test(name)) return '🎬';
+  return '📝';
+}
+
+// Month navigation
+window.shiftMonth=function(delta){
+  const [y,m]=currentMonth.split('-').map(Number);
+  const d=new Date(y,m-1+delta,1);
+  currentMonth=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+  showAllTxnsFlag=false;
+  renderAll();
+};
+
+// Wallet visibility toggle
+let walletHidden=false;
+window.toggleWalletVis=function(){
+  walletHidden=!walletHidden;
+  const el=document.getElementById('kpi-wallet');
+  if(!el) return;
+  const monthTxns=txns[currentMonth]||[];
+  const txnIn=monthTxns.filter(t=>t.type==='in').reduce((s,t)=>s+Number(t.amount),0);
+  const txnOut=monthTxns.filter(t=>t.type==='out').reduce((s,t)=>s+Number(t.amount),0);
+  const wallet=walletBase+txnIn-txnOut;
+  el.textContent=walletHidden?'••••••':fmt(wallet);
+  const eye=document.getElementById('wallet-eye');
+  if(eye) eye.style.opacity=walletHidden?'0.4':'1';
+};
+
+// Override setSyncBadge to use dot indicator
+function setSyncBadge(cls,txt){
+  const badge=document.getElementById('sync-badge');
+  const dot=document.getElementById('sync-dot');
+  if(!dot) return;
+  dot.className='sync-dot'+' '+cls;
+  if(badge) badge.title=txt;
+}
+
+// Override setTheme/toggleDarkMode for new toggle
+window.toggleDarkMode=function(on){
+  const th=on?'dark':'light';
+  setTheme(th);
+};
+function setTheme(t){
+  currentTheme=t;
+  const attr=t==='dark'?'':t;
+  document.documentElement.setAttribute('data-theme',attr);
+  localStorage.setItem('vn_theme',t);
+  const tog=document.getElementById('dark-mode-toggle');
+  if(tog) tog.checked=(t==='dark'||t==='amoled');
+}
+window.setTheme=setTheme;
+
+// Accent color
+const ACCENTS={
+  lime:   {accent:'#C8FF57',dark:'#0F0F14'},
+  blue:   {accent:'#57C8FF',dark:'#0F0F14'},
+  green:  {accent:'#4CAF50',dark:'#fff'},
+  orange: {accent:'#FF9800',dark:'#0F0F14'},
+  purple: {accent:'#C57BFF',dark:'#0F0F14'},
+};
+window.setAccent=function(name){
+  const a=ACCENTS[name];if(!a)return;
+  document.documentElement.style.setProperty('--accent',a.accent);
+  localStorage.setItem('vn_accent',name);
+  const sub=document.getElementById('theme-sub');
+  const labels={lime:'Lime',blue:'Xanh',green:'Lá',orange:'Cam',purple:'Tím'};
+  if(sub) sub.textContent=labels[name]||name;
+  document.querySelectorAll('.tp-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tp-'+name)?.classList.add('active');
+  closeModal('modal-theme');
+};
+function initAccent(){
+  const saved=localStorage.getItem('vn_accent')||'lime';
+  setAccent(saved);
+}
+
+// Export JSON
+window.exportJSON=function(){
+  const data={debts,income,expense,ticks,txns,savings,walletBase,lastAutoMonth};
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download=`vi-cua-toi-${currentMonth}.json`;
+  a.click();URL.revokeObjectURL(url);
+  showToast('✓ Đã xuất dữ liệu');
+};
+
+// openTxnSearch / openTxnFilter placeholders
+window.openTxnSearch=()=>showToast('🔍 Tính năng đang phát triển');
+window.openTxnFilter=()=>showToast('🔽 Tính năng đang phát triển');
+window.openTxnModalType=function(type){
+  window.openTxnModal();
+  window.setTxnType(type);
+};
+
+// ── REPORT PAGE ───────────────────────────────────────────────
+let donutChart=null, barChart=null;
+
+function renderReport(){
+  const el=id=>document.getElementById(id);
+  if(el('report-month-label')) el('report-month-label').textContent=getML(currentMonth);
+  const m=parseInt(currentMonth.split('-')[1]);
+  if(el('rpt-title')) el('rpt-title').textContent=`Tổng quan tháng ${m}`;
+
+  const totalIncome =income.reduce((s,x)=>s+Number(x.amount),0);
+  const monthTxns   =txns[currentMonth]||[];
+  const txnIn       =monthTxns.filter(t=>t.type==='in').reduce((s,t)=>s+Number(t.amount),0);
+  const txnOut      =monthTxns.filter(t=>t.type==='out').reduce((s,t)=>s+Number(t.amount),0);
+  const totalIn     =totalIncome+txnIn;
+  const totalExpense=(expense.reduce((s,x)=>s+Number(x.amount),0))+txnOut;
+  const totalSaving =savings.reduce((s,x)=>s+Number(x.amount),0);
+
+  if(el('rpt-income'))  el('rpt-income').textContent=fmt(totalIn);
+  if(el('rpt-expense')) el('rpt-expense').textContent=fmt(totalExpense);
+  if(el('rpt-saving'))  el('rpt-saving').textContent=fmt(totalSaving);
+
+  renderDonutChart(txnOut, monthTxns);
+  renderBarChart();
+}
+
+// Category grouping for donut
+const CAT_GROUPS=[
+  {label:'Ăn uống',   color:'#4CAF50', match:/ăn|food|cơm|phở|nhà hàng|cafe/i},
+  {label:'Gia đình',  color:'#2196F3', match:/gia đình|sinh hoạt|nhà/i},
+  {label:'Di chuyển', color:'#FF9800', match:/xăng|xe|di chuyển|đi lại/i},
+  {label:'Giải trí',  color:'#E91E63', match:/giải trí|phim|game/i},
+  {label:'Khác',      color:'#9C27B0', match:/.*/},
+];
+
+function categorize(name){
+  return CAT_GROUPS.find(c=>c.match.test(name))||CAT_GROUPS[CAT_GROUPS.length-1];
+}
+
+function renderDonutChart(fixedExpense, monthTxns){
+  const el=id=>document.getElementById(id);
+  const outTxns=monthTxns.filter(t=>t.type==='out');
+  const cats={};
+  outTxns.forEach(t=>{
+    const c=categorize(t.name);
+    cats[c.label]=(cats[c.label]||{label:c.label,color:c.color,amount:0});
+    cats[c.label].amount+=Number(t.amount);
+  });
+  // Add fixed expenses as "Gia đình"
+  if(fixedExpense>0&&!outTxns.length){
+    cats['Chi cố định']={label:'Chi cố định',color:'#2196F3',amount:fixedExpense};
+  }
+  const data=Object.values(cats).filter(c=>c.amount>0);
+  const total=data.reduce((s,c)=>s+c.amount,0)||1;
+  if(el('donut-total')) el('donut-total').textContent=fmt(total);
+
+  const canvas=el('donut-chart');
+  if(!canvas) return;
+  if(donutChart) donutChart.destroy();
+  donutChart=new Chart(canvas,{
+    type:'doughnut',
+    data:{labels:data.map(c=>c.label),datasets:[{data:data.map(c=>c.amount),backgroundColor:data.map(c=>c.color),borderWidth:2,borderColor:'var(--surface)'}]},
+    options:{cutout:'70%',plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${ctx.label}: ${fmt(ctx.raw)}`}}},animation:{animateRotate:true,duration:600}}
+  });
+
+  const legend=el('donut-legend');
+  if(legend){
+    legend.innerHTML='';
+    data.forEach(c=>{
+      const pct=Math.round(c.amount/total*100);
+      const row=document.createElement('div');row.className='dl-row';
+      row.innerHTML=`<div class="dl-dot" style="background:${c.color}"></div>
+        <span class="dl-name">${c.label}</span>
+        <span class="dl-pct">${pct}%</span>
+        <span class="dl-amt">${fmt(c.amount)}</span>`;
+      legend.appendChild(row);
+    });
+  }
+}
+
+function renderBarChart(){
+  const canvas=document.getElementById('bar-chart');
+  if(!canvas) return;
+  const labels=[],dataIn=[],dataOut=[];
+  const [cy,cm]=currentMonth.split('-').map(Number);
+  for(let i=5;i>=0;i--){
+    const d=new Date(cy,cm-1-i,1);
+    const key=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    labels.push(`T${d.getMonth()+1}`);
+    const mt=txns[key]||[];
+    const inc=income.reduce((s,x)=>s+Number(x.amount),0)+mt.filter(t=>t.type==='in').reduce((s,t)=>s+Number(t.amount),0);
+    const exp=expense.reduce((s,x)=>s+Number(x.amount),0)+mt.filter(t=>t.type==='out').reduce((s,t)=>s+Number(t.amount),0);
+    dataIn.push(+(inc/1e6).toFixed(1));
+    dataOut.push(+(exp/1e6).toFixed(1));
+  }
+  if(barChart) barChart.destroy();
+  barChart=new Chart(canvas,{
+    type:'bar',
+    data:{labels,datasets:[
+      {label:'Thu',data:dataIn,backgroundColor:'rgba(76,175,80,.7)',borderRadius:6,borderSkipped:false},
+      {label:'Chi',data:dataOut,backgroundColor:'rgba(244,67,54,.7)',borderRadius:6,borderSkipped:false},
+    ]},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${ctx.raw}M`}}},
+      scales:{
+        x:{grid:{display:false},ticks:{color:'var(--sub)',font:{size:11,weight:'600'}}},
+        y:{grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'var(--sub)',font:{size:10},callback:v=>v+'M'}}
+      }
+    }
+  });
+}
+
+// Override switchPage to include report
+window.switchPage=function(name){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.ni').forEach(b=>b.classList.remove('active'));
+  document.getElementById('page-'+name)?.classList.add('active');
+  document.getElementById('nav-'+name)?.classList.add('active');
+  openDetail=null;showAllTxnsFlag=false;
+  if(name==='home')     renderHome();
+  if(name==='paid')     renderPaid();
+  if(name==='txn')      renderTxnPage();
+  if(name==='report')   renderReport();
+  if(name==='settings') renderSettings();
+  if(name==='tools')    renderTools();
+};
+
+// Override renderAll to include report if visible
+const _origRenderAll=renderAll;
+function renderAll(){
+  autoReduceDebts();
+  renderHome();
+  renderPaid();
+  renderTxnPage();
+  renderSettings();
+  renderTools();
+  const rp=document.getElementById('page-report');
+  if(rp&&rp.classList.contains('active')) renderReport();
+}
+
+// Init accent on load
+document.addEventListener('DOMContentLoaded',()=>{
+  initAccent();
+  const th=localStorage.getItem('vn_theme')||'dark';
+  setTheme(th);
+});
+

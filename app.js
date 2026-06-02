@@ -224,105 +224,11 @@ function initTheme(){
 }
 
 // ── RENDER ALL ────────────────────────────────────────────────
-function renderAll(){
-  autoReduceDebts();
-  renderHome();
-  renderPaid();
-  renderTxnPage();
-  renderSettings();
-  renderTools();
-}
 
 // ── HOME ──────────────────────────────────────────────────────
-function renderHome(){
-  const n=new Date();
-  const sd=document.getElementById('sub-date');
-  if(sd) sd.textContent=n.toLocaleDateString('vi-VN',{weekday:'long',day:'numeric',month:'numeric'});
-  const ml=document.getElementById('month-label');
-  if(ml) ml.textContent=getML(currentMonth);
-
-  const totalIncome =income.reduce((s,x)=>s+Number(x.amount),0);
-  const totalExpense=expense.reduce((s,x)=>s+Number(x.amount),0);
-  const totalDebtPay=debts.filter(d=>!d.settled).reduce((s,d)=>{
-    return s+(d.type==='tc'?tcGetMonthly(d):Number(d.monthly||0));
-  },0);
-
-  const monthTxns=txns[currentMonth]||[];
-  const txnIn =monthTxns.filter(t=>t.type==='in').reduce((s,t)=>s+Number(t.amount),0);
-  const txnOut=monthTxns.filter(t=>t.type==='out').reduce((s,t)=>s+Number(t.amount),0);
-  const totalIn =totalIncome+txnIn;
-  const totalOut=totalExpense+txnOut;
-  const remain  =totalIn-totalOut-totalDebtPay;
-  const totalDebtLeft=debts.filter(d=>!d.settled).reduce((s,d)=>{
-    return s+(d.type==='tc'?tcGetDebt(d):Number(d.used||0));
-  },0);
-
-  const el=id=>document.getElementById(id);
-  if(el('kpi-income'))   el('kpi-income').textContent=fmt(totalIn);
-  if(el('kpi-expense'))  el('kpi-expense').textContent=fmt(totalOut);
-  if(el('kpi-debt-pay')) el('kpi-debt-pay').textContent=fmt(totalDebtPay);
-  if(el('kpi-remain')){
-    el('kpi-remain').textContent=remain>=0?fmt(remain):'-'+fmt(Math.abs(remain));
-    el('kpi-remain').style.color=remain>=0?'var(--purple)':'var(--red)';
-  }
-  if(el('kpi-debt-total')) el('kpi-debt-total').textContent=fmt(totalDebtLeft);
-  const wallet=walletBase+txnIn-txnOut;
-  if(el('kpi-wallet')){
-    el('kpi-wallet').textContent=fmt(wallet);
-    el('kpi-wallet').style.color=wallet>=0?'var(--blue)':'var(--red)';
-  }
-
-  if(totalIn>0){
-    const ep=Math.min(totalOut/totalIn*100,100);
-    const dp=Math.min(totalDebtPay/totalIn*100,Math.max(0,100-ep));
-    const rp=Math.max(100-ep-dp,0);
-    if(el('rb-expense')) el('rb-expense').style.width=ep+'%';
-    if(el('rb-debt'))    el('rb-debt').style.width=dp+'%';
-    if(el('rb-remain'))  el('rb-remain').style.width=rp+'%';
-  }
-
-  const ms=ticks[currentMonth]||{};
-  const paidAmt=debts.filter(d=>!d.settled&&ms[d.id]).reduce((s,d)=>s+(d.type==='tc'?tcGetMonthly(d):Number(d.monthly||0)),0);
-  const pct=totalDebtPay?Math.round(paidAmt/totalDebtPay*100):0;
-  if(el('prog-fill')) el('prog-fill').style.width=pct+'%';
-  if(el('prog-pct'))  el('prog-pct').textContent=pct+'%';
-}
 
 // ── PAID ──────────────────────────────────────────────────────
-function renderPaid(){
-  const pml=document.getElementById('paid-month-label');
-  if(pml) pml.textContent=getML(currentMonth);
-  const ps=document.getElementById('paid-subtitle');
-  if(ps) ps.textContent=getML(currentMonth);
 
-  const ms=ticks[currentMonth]||{};
-  const activeDebts=debts.filter(d=>!d.settled);
-  const totalPay=activeDebts.reduce((s,d)=>s+(d.type==='tc'?tcGetMonthly(d):Number(d.monthly||0)),0);
-  const paidAmt =activeDebts.filter(d=>ms[d.id]).reduce((s,d)=>s+(d.type==='tc'?tcGetMonthly(d):Number(d.monthly||0)),0);
-
-  const el=id=>document.getElementById(id);
-  if(el('ps-total-debt')) el('ps-total-debt').textContent=fmt(totalPay);
-  if(el('ps-paid'))       el('ps-paid').textContent=fmt(paidAmt);
-  if(el('ps-unpaid'))     el('ps-unpaid').textContent=fmt(totalPay-paidAmt);
-  renderCards();
-}
-
-function renderCards(){
-  const list=document.getElementById('card-list');
-  if(!list) return;
-  list.innerHTML='';
-  const ms=ticks[currentMonth]||{};
-  let show=debts;
-  if(currentFilter==='td')     show=debts.filter(d=>d.type==='td');
-  if(currentFilter==='tc')     show=debts.filter(d=>d.type==='tc');
-  if(currentFilter==='unpaid') show=debts.filter(d=>!ms[d.id]&&!d.settled);
-  const td=show.filter(d=>d.type==='td');
-  const tc=show.filter(d=>d.type==='tc');
-  if(!show.length){list.innerHTML=`<div class="empty">✅ Tháng này xong rồi!</div>`;return;}
-  if(td.length){addSec(list,'💳 Thẻ Tín Dụng');const w=lastWrap(list);td.forEach(d=>addCard(w,d,ms));}
-  if(tc.length){addSec(list,'💰 Vay Tín Chấp'); const w=lastWrap(list);tc.forEach(d=>addCard(w,d,ms));}
-  list.appendChild(Object.assign(document.createElement('div'),{style:'height:12px'}));
-}
 
 function addSec(list,txt){
   const h=document.createElement('div');h.className='slabel';h.textContent=txt;list.appendChild(h);
@@ -446,34 +352,6 @@ window.filterTab=function(f,el){
 };
 
 // ── TXN PAGE ──────────────────────────────────────────────────
-function renderTxnPage(){
-  const el=id=>document.getElementById(id);
-  if(el('txn-subtitle'))    el('txn-subtitle').textContent=getML(currentMonth);
-  if(el('txn-month-label')) el('txn-month-label').textContent=getML(currentMonth);
-  const monthTxns=txns[currentMonth]||[];
-  const txnIn =monthTxns.filter(t=>t.type==='in').reduce((s,t)=>s+Number(t.amount),0);
-  const txnOut=monthTxns.filter(t=>t.type==='out').reduce((s,t)=>s+Number(t.amount),0);
-  if(el('txn-kpi-in'))  el('txn-kpi-in').textContent=fmt(txnIn);
-  if(el('txn-kpi-out')) el('txn-kpi-out').textContent=fmt(txnOut);
-  const wi=el('wallet-base-input');
-  if(wi){wi.value=walletBase?fmtNoUnit(walletBase):'';wi.dataset.raw=walletBase;}
-  const list=el('txn-list');
-  if(list){
-    list.innerHTML='';
-    if(!monthTxns.length){
-      list.innerHTML=`<div class="empty" style="padding:24px 0">Chưa có giao dịch nào</div>`;
-    } else {
-      [...monthTxns].reverse().forEach(t=>{
-        const row=document.createElement('div');row.className='txn-row';
-        row.onclick=()=>openTxnEdit(t.id);
-        row.innerHTML=`<div class="txn-dot ${t.type}"></div><div class="txn-name">${t.name}</div>
-          <div class="txn-amt ${t.type}">${t.type==='in'?'+':'-'}${fmt(t.amount)}</div>`;
-        list.appendChild(row);
-      });
-    }
-  }
-  renderSavingList();
-}
 
 window.openTxnModal=function(){
   editTxnId=null;
@@ -982,8 +860,6 @@ initTheme();
 // NEW UI FUNCTIONS — matching new index.html
 // ══════════════════════════════════════════════════════════════
 
-// Override renderHome to use new circular progress + upcoming card
-const _origRenderHome = renderHome; // keep for reference but we override below
 
 function renderHome(){
   const el=id=>document.getElementById(id);
@@ -1039,8 +915,6 @@ function renderHome(){
   if(el('upcoming-card')) el('upcoming-card').style.display=upcoming.length?'flex':'none';
 }
 
-// Override renderPaid with new badge counts + progress bar
-const _origRenderPaid = renderPaid;
 function renderPaid(){
   const el=id=>document.getElementById(id);
   if(el('paid-month-label')) el('paid-month-label').textContent=getML(currentMonth);
@@ -1065,7 +939,6 @@ function renderPaid(){
   renderCards();
 }
 
-// Override renderCards with new card UI (bank icon, usage bar)
 function renderCards(){
   const list=document.getElementById('card-list');
   if(!list) return;
@@ -1168,7 +1041,6 @@ function addCard2(wrap,d,ms){
   wrap.appendChild(div);
 }
 
-// Override filterTab for new seg2 buttons
 window.filterTab=function(f,el){
   currentFilter=f; openDetail=null;
   document.querySelectorAll('.seg2-btn').forEach(b=>b.classList.remove('active'));
@@ -1176,7 +1048,6 @@ window.filterTab=function(f,el){
   renderCards();
 };
 
-// Override renderTxnPage for new layout
 function renderTxnPage(){
   const el=id=>document.getElementById(id);
   if(el('txn-month-label')) el('txn-month-label').textContent=getML(currentMonth);
@@ -1261,7 +1132,6 @@ window.toggleWalletVis=function(){
   if(eye) eye.style.opacity=walletHidden?'0.4':'1';
 };
 
-// Override setSyncBadge to use dot indicator
 function setSyncBadge(cls,txt){
   const badge=document.getElementById('sync-badge');
   const dot=document.getElementById('sync-dot');
@@ -1270,7 +1140,6 @@ function setSyncBadge(cls,txt){
   if(badge) badge.title=txt;
 }
 
-// Override setTheme/toggleDarkMode for new toggle
 window.toggleDarkMode=function(on){
   const th=on?'dark':'light';
   setTheme(th);
@@ -1439,7 +1308,6 @@ function renderBarChart(){
   });
 }
 
-// Override switchPage to include report
 window.switchPage=function(name){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.ni').forEach(b=>b.classList.remove('active'));
@@ -1454,8 +1322,6 @@ window.switchPage=function(name){
   if(name==='tools')    renderTools();
 };
 
-// Override renderAll to include report if visible
-const _origRenderAll=renderAll;
 function renderAll(){
   autoReduceDebts();
   renderHome();

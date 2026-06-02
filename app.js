@@ -1282,6 +1282,8 @@ window.switchPage=function(name){
   if(name==='txn')      renderTxnPage();
   if(name==='report')   renderReport();
   if(name==='settings') renderSettings();
+  if(name==='debt')     renderSettings();
+  if(name==='finance')  renderSettings();
   if(name==='tools')    renderTools();
 };
 

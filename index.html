@@ -318,6 +318,7 @@
 <div class="modal-bg" id="modal-saving" onclick="closeMBg('modal-saving',event)"><div class="msheet"><div class="mhandle"></div><div class="mtitle">Thêm vào quỹ tiết kiệm</div><div class="fg"><label>Ghi chú</label><input id="sv-name" type="text" placeholder="VD: Tiết kiệm tháng 6"></div><div class="fg"><label>Số tiền (đ)</label><input id="sv-amount" type="text" inputmode="numeric" oninput="fmtInput(this)" placeholder="VD: 1,000,000"></div><div class="mbtns"><button class="mbtn mbtn-cancel" onclick="closeModal('modal-saving')">Huỷ</button><button class="mbtn mbtn-save" onclick="saveSaving()">Lưu</button></div></div></div>
 
 <div class="modal-bg" id="modal-debt" onclick="closeMBg('modal-debt',event)"><div class="msheet"><div class="mhandle"></div><div class="mtitle" id="md-title">Thêm khoản nợ</div>
+  <input id="md-disburse" type="hidden">
   <div class="fg"><label>Tên ngân hàng / tổ chức</label><input id="md-name" type="text" placeholder="VD: TP Bank"></div>
   <div class="fg"><label>Loại</label><select id="md-type" class="fg-sel" onchange="onDebtTypeChange(this.value)"><option value="td">💳 Thẻ Tín Dụng</option><option value="tc">💰 Vay Tín Chấp</option></select></div>
   <div class="fg"><label>Ngày thanh toán hàng tháng</label><input id="md-payday" type="number" inputmode="numeric" placeholder="VD: 15" min="1" max="31"></div>

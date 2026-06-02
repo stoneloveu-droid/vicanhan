@@ -28,15 +28,8 @@ window.fmtInput = fmtInput;
 
 // ── DEFAULTS ─────────────────────────────────────────────────
 const DEF_DEBTS = [
-  {id:'tp',      name:'TP Bank',    type:'td', limit:20000000,  used:12000000,  monthly:216000,  note:'1.80%/th', payDay:15, settleFee:0},
-  {id:'ocb',     name:'OCB Bank',   type:'td', limit:50000000,  used:36300000,  monthly:834900,  note:'2.30%/th', payDay:20, settleFee:0},
-  {id:'vp-td',   name:'VP Bank TD', type:'td', limit:60000000,  used:40500000,  monthly:202500,  note:'0.50%/th', payDay:10, settleFee:0},
-  {id:'shin-td', name:'Shinhan TD', type:'td', limit:40000000,  used:24500000,  monthly:318500,  note:'1.30%/th', payDay:25, settleFee:0},
-  {id:'vp-tc',   name:'VP Bank TC', type:'tc', principal:30000000, disburseDate:'2023-04-01', rate:1.5, totalTerm:35, curTerm:13, payDay:5,  note:''},
-  {id:'shin-tc', name:'Shinhan TC', type:'tc', principal:50000000, disburseDate:'2021-07-01', rate:1.2, totalTerm:60, curTerm:46, payDay:8,  note:''},
-  {id:'hsbc',    name:'HSBC Bank',  type:'tc', principal:55000000, disburseDate:'2021-04-01', rate:1.3, totalTerm:60, curTerm:49, payDay:12, note:''},
-  {id:'vib1',    name:'VIB Bank 1', type:'tc', principal:60000000, disburseDate:'2021-07-01', rate:1.4, totalTerm:60, curTerm:46, payDay:15, note:''},
-  {id:'vib2',    name:'VIB Bank 2', type:'tc', principal:35000000, disburseDate:'2023-06-01', rate:1.6, totalTerm:36, curTerm:11, payDay:20, note:''},
+  {id:'sample-td', name:'Thẻ mẫu', type:'td', limit:50000000, used:10000000, monthly:200000, note:'1.00%/th', payDay:15, settleFee:0},
+  {id:'sample-tc', name:'Vay mẫu', type:'tc', principal:30000000, rate:1.2, totalTerm:36, curTerm:6, payDay:10, note:''},
 ];
 const DEF_INCOME  = [{id:'sal',    name:'Lương cơ bản',         amount:12000000, note:'Hàng tháng'}];
 const DEF_EXPENSE = [{id:'living', name:'Sinh hoạt / gia đình', amount:8200000,  note:'Cố định'}];
@@ -117,7 +110,8 @@ function migrateDebts(){
 
 // ── AUTO-REDUCE chỉ chạy 1 lần / tháng ───────────────────────
 function autoReduceDebts(){
-  if(!currentMonth||lastAutoMonth===currentMonth) return;
+  const realMonth=(()=>{const n=new Date();return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}`;})();
+  if(lastAutoMonth===realMonth) return;
   debts.forEach(d=>{
     if(d.settled) return;
     if(d.type==='tc'&&d.totalTerm){
@@ -125,7 +119,7 @@ function autoReduceDebts(){
       if(d.curTerm>=d.totalTerm) d.settled=true;
     }
   });
-  lastAutoMonth=currentMonth;
+  lastAutoMonth=realMonth;
   saveToFirestore();
 }
 
@@ -201,17 +195,6 @@ onAuthStateChanged(auth,async(user)=>{
 });
 
 // ── THEME ─────────────────────────────────────────────────────
-window.setTheme=function(t){
-  currentTheme=t;
-  document.documentElement.setAttribute('data-theme',t);
-  localStorage.setItem('vn_theme',t);
-  ['dark','light','amoled'].forEach(th=>{
-    document.getElementById('tp-'+th)?.classList.toggle('active',th===t);
-  });
-  const names={dark:'Dark 🌑',light:'Light ☀️',amoled:'AMOLED ⚫'};
-  const sub=document.getElementById('theme-sub');
-  if(sub) sub.textContent=names[t]||t;
-};
 function initTheme(){
   const saved=localStorage.getItem('vn_theme')||'dark';
   setTheme(saved);
@@ -337,12 +320,6 @@ window.tapCheck=async function(id){
 
   if(currentFilter==='unpaid') setTimeout(()=>{openDetail=null;renderCards();},500);
   await saveToFirestore();
-};
-
-window.filterTab=function(f,el){
-  currentFilter=f;openDetail=null;
-  document.querySelectorAll('.seg-btn').forEach(b=>b.classList.remove('active'));
-  el.classList.add('active');renderCards();
 };
 
 // ── TXN PAGE ──────────────────────────────────────────────────
@@ -472,7 +449,7 @@ window.calcSaving=function(){
   if(!goal||!months){showToast('⚠️ Nhập đủ thông tin');return;}
   const r=rYear/12;
   const monthly=r>0?goal*r/(Math.pow(1+r,months)-1):goal/months;
-  const totalDeposit=monthly*months;const interest=goal-totalDeposit;
+  const totalDeposit=monthly*months;const interest=Math.max(0,goal-totalDeposit);
   res.className='tool-result show';
   res.innerHTML=`<div class="tr-row"><span class="tr-label">Cần gửi mỗi tháng</span><span class="tr-val" style="color:var(--green)">${fmt(monthly)}</span></div>
     <div class="tr-row"><span class="tr-label">Tổng tiền gốc</span><span class="tr-val">${fmt(totalDeposit)}</span></div>
@@ -615,6 +592,8 @@ window.calcTcFields=function calcTcFields(){
     document.getElementById('tc-calc-remain').textContent =fmt(remain);
     document.getElementById('tc-calc-interest').textContent=fmt(interest);
     document.getElementById('tc-calc-principal').textContent=fmt(prinPart);
+    document.getElementById('tc-calc-total-int').textContent=fmt(Math.max(0,monthly*(total-paid)-remain));
+    document.getElementById('tc-calc-total-pay').textContent=fmt(monthly*(total-paid));
   }
 };
 window.calcTdFields=function calcTdFields(){
@@ -756,15 +735,16 @@ window.deleteFin=function(){
 };
 
 // ── MONTH PICKER ──────────────────────────────────────────────
-window.pickerYear = new Date().getFullYear();
+let pickerYear = new Date().getFullYear();
+Object.defineProperty(window,'pickerYear',{get(){return pickerYear;},set(v){pickerYear=v;}});
 window.openMonthPicker=function(){
-  window.pickerYear=parseInt(currentMonth.split('-')[0]);
+  pickerYear=parseInt(currentMonth.split('-')[0]);
   renderMonthPicker();
   document.getElementById('modal-month').classList.add('open');
 };
 window.renderMonthPicker=renderMonthPicker;
 function renderMonthPicker(){
-  const yr=window.pickerYear;
+  const yr=pickerYear;
   document.getElementById('mp-title').textContent=`Chọn tháng — ${yr}`;
   const grid=document.getElementById('mp-grid');grid.innerHTML='';
   const nav=document.createElement('div');
@@ -786,18 +766,6 @@ function renderMonthPicker(){
 // ── UTILS ─────────────────────────────────────────────────────
 window.closeModal=id=>document.getElementById(id)?.classList.remove('open');
 window.closeMBg=(id,e)=>{if(e.target===document.getElementById(id)) window.closeModal(id);};
-window.switchPage=function(name){
-  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-  document.querySelectorAll('.ni').forEach(b=>b.classList.remove('active'));
-  document.getElementById('page-'+name)?.classList.add('active');
-  document.getElementById('nav-'+name)?.classList.add('active');
-  openDetail=null;
-  if(name==='home')     renderHome();
-  if(name==='paid')     renderPaid();
-  if(name==='txn')      renderTxnPage();
-  if(name==='tools')    renderTools();
-  if(name==='settings') renderSettings();
-};
 window.resetAll=function(){
   confirmAction('Reset toàn bộ về mặc định? Không thể hoàn tác!',async()=>{
     debts=clone(DEF_DEBTS);income=clone(DEF_INCOME);expense=clone(DEF_EXPENSE);
@@ -1211,7 +1179,7 @@ function renderReport(){
   if(el('rpt-expense')) el('rpt-expense').textContent=fmt(totalExpense);
   if(el('rpt-saving'))  el('rpt-saving').textContent=fmt(totalSaving);
 
-  renderDonutChart(txnOut, monthTxns);
+  renderDonutChart(totalExpense, monthTxns);
   renderBarChart();
 }
 
@@ -1238,8 +1206,9 @@ function renderDonutChart(fixedExpense, monthTxns){
     cats[c.label].amount+=Number(t.amount);
   });
   // Add fixed expenses as "Gia đình"
-  if(fixedExpense>0&&!outTxns.length){
-    cats['Chi cố định']={label:'Chi cố định',color:'#2196F3',amount:fixedExpense};
+  if(fixedExpense>0){
+    cats['Chi cố định']=(cats['Chi cố định']||{label:'Chi cố định',color:'#2196F3',amount:0});
+    cats['Chi cố định'].amount+=fixedExpense;
   }
   const data=Object.values(cats).filter(c=>c.amount>0);
   const total=data.reduce((s,c)=>s+c.amount,0)||1;
@@ -1333,4 +1302,3 @@ document.addEventListener('DOMContentLoaded',()=>{
   const th=localStorage.getItem('vn_theme')||'dark';
   setTheme(th);
 });
-

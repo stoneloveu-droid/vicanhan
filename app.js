@@ -303,6 +303,17 @@ window.openTxnModal=function(){
   document.getElementById('txn-name').value='';
   const ta=document.getElementById('txn-amount');ta.value='';ta.dataset.raw='';
   document.getElementById('txn-del').style.display='none';
+  // Set date mặc định = hôm nay, giới hạn min/max theo tháng đang xem
+  const dateEl=document.getElementById('txn-date');
+  if(dateEl){
+    const today=new Date().toISOString().slice(0,10);
+    const [y,m]=currentMonth.split('-');
+    const lastDay=new Date(+y,+m,0).getDate();
+    dateEl.min=`${currentMonth}-01`;
+    dateEl.max=`${currentMonth}-${String(lastDay).padStart(2,'0')}`;
+    // Nếu tháng hiện tại = tháng đang xem thì default hôm nay, không thì ngày 1
+    dateEl.value=today.startsWith(currentMonth)?today:`${currentMonth}-01`;
+  }
   setTxnType('out');
   document.getElementById('modal-txn').classList.add('open');
   setTimeout(()=>document.getElementById('txn-amount').focus(),350);
@@ -313,6 +324,8 @@ function openTxnEdit(id){
   document.getElementById('txn-name').value=t.name;
   setInputFmt('txn-amount',t.amount);
   document.getElementById('txn-del').style.display='block';
+  const dateEl=document.getElementById('txn-date');
+  if(dateEl&&t.date) dateEl.value=t.date;
   setTxnType(t.type);
   document.getElementById('modal-txn').classList.add('open');
 }
@@ -344,8 +357,9 @@ window.saveTxn=async function(){
   const amount=getInputVal('txn-amount');
   if(!amount){showToast('⚠️ Nhập số tiền');return;}
   if(!txns[currentMonth]) txns[currentMonth]=[];
-  if(editTxnId){const t=txns[currentMonth].find(x=>x.id===editTxnId);if(t){t.name=name;t.amount=amount;t.type=txnType;}}
-  else txns[currentMonth].push({id:'t'+Date.now(),name,amount,type:txnType});
+  const txnDate=document.getElementById('txn-date')?.value||new Date().toISOString().slice(0,10);
+  if(editTxnId){const t=txns[currentMonth].find(x=>x.id===editTxnId);if(t){t.name=name;t.amount=amount;t.type=txnType;t.date=txnDate;}}
+  else txns[currentMonth].push({id:'t'+Date.now(),name,amount,type:txnType,date:txnDate});
   await saveToFirestore();window.closeModal('modal-txn');
   const s=getState();renderTxnPage(s);renderHome(s);
   showToast(txnType==='in'?`✓ +${fmt(amount)} Thu`:`✓ -${fmt(amount)} Chi`);
@@ -591,17 +605,36 @@ window.toggleTool=function(id){
   if(!isOpen){body.classList.add('open');arrow.classList.add('open');}
 };
 window.calcInterest=function(){
-  const P=getInputVal('ti-principal');const r=Number(document.getElementById('ti-rate').value)/100||0;
-  const n=Number(document.getElementById('ti-terms').value)||0;
-  const res=document.getElementById('ti-result');
-  if(!P||!r||!n){showToast('⚠️ Nhập đủ thông tin');return;}
-  const monthly=P*r*Math.pow(1+r,n)/(Math.pow(1+r,n)-1);
-  const total=monthly*n;const interest=total-P;
-  res.className='tool-result show';
-  res.innerHTML=`<div class="tr-row"><span class="tr-label">Trả mỗi tháng</span><span class="tr-val" style="color:var(--accent)">${fmt(monthly)}</span></div>
-    <div class="tr-row"><span class="tr-label">Tổng trả ${n} kỳ</span><span class="tr-val">${fmt(total)}</span></div>
-    <div class="tr-row"><span class="tr-label">Tổng tiền lãi</span><span class="tr-val" style="color:var(--red)">${fmt(interest)}</span></div>
-    <div class="tr-row"><span class="tr-label">Vốn gốc</span><span class="tr-val">${fmt(P)}</span></div>`;
+  const P       =getInputVal('ti-principal');
+  const rYear   =Number(document.getElementById('ti-rate').value)||0;
+  const n       =Number(document.getElementById('ti-terms').value)||0;
+  const method  =document.getElementById('ti-method')?.value||'reducing_balance';
+  const res     =document.getElementById('ti-result');
+  if(!P||!rYear||!n){showToast('⚠️ Nhập đủ thông tin');return;}
+  const r=rYear/100/12;
+  let monthly,total,interest;
+  if(method==='fixed_principal'){
+    const princ=P/n;
+    const firstMonth=princ+P*r;
+    const lastMonth =princ+(P/n)*r;
+    total   =tcTotalInterest(P,rYear,n,'fixed_principal')+P;
+    interest=tcTotalInterest(P,rYear,n,'fixed_principal');
+    monthly =firstMonth; // tháng đầu (cao nhất)
+    res.className='tool-result show';
+    res.innerHTML=`<div class="tr-row"><span class="tr-label">Trả tháng đầu</span><span class="tr-val" style="color:var(--accent)">${fmt(firstMonth)}</span></div>
+      <div class="tr-row"><span class="tr-label">Trả tháng cuối</span><span class="tr-val" style="color:var(--accent)">${fmt(lastMonth)}</span></div>
+      <div class="tr-row"><span class="tr-label">Tổng trả ${n} kỳ</span><span class="tr-val">${fmt(total)}</span></div>
+      <div class="tr-row"><span class="tr-label">Tổng tiền lãi</span><span class="tr-val" style="color:var(--red)">${fmt(interest)}</span></div>
+      <div class="tr-row"><span class="tr-label">Vốn gốc</span><span class="tr-val">${fmt(P)}</span></div>`;
+  } else {
+    const pmt=r?P*r*Math.pow(1+r,n)/(Math.pow(1+r,n)-1):P/n;
+    total=pmt*n; interest=total-P;
+    res.className='tool-result show';
+    res.innerHTML=`<div class="tr-row"><span class="tr-label">Trả mỗi tháng (cố định)</span><span class="tr-val" style="color:var(--accent)">${fmt(pmt)}</span></div>
+      <div class="tr-row"><span class="tr-label">Tổng trả ${n} kỳ</span><span class="tr-val">${fmt(total)}</span></div>
+      <div class="tr-row"><span class="tr-label">Tổng tiền lãi</span><span class="tr-val" style="color:var(--red)">${fmt(interest)}</span></div>
+      <div class="tr-row"><span class="tr-label">Vốn gốc</span><span class="tr-val">${fmt(P)}</span></div>`;
+  }
 };
 window.calcSaving=function(){
   const goal=getInputVal('sc-goal');const rYear=Number(document.getElementById('sc-rate').value)/100||0;
@@ -680,3 +713,29 @@ document.addEventListener('DOMContentLoaded',()=>{
   const th=localStorage.getItem('vn_theme')||'dark';
   setTheme(th);
 });
+
+// ── EXPORT CSV (UX#9) ─────────────────────────────────────────
+window.exportCSV=function(){
+  const rows=[['Tháng','Loại','Tên','Số tiền','Ngày','Danh mục']];
+  Object.entries(txns).forEach(([month,list])=>{
+    (list||[]).forEach(t=>{
+      rows.push([getML(month), t.type==='in'?'Thu':'Chi', t.name, t.amount, t.date||'', t.cat||'']);
+    });
+  });
+  income.forEach(x=>rows.push(['Cố định','Thu',x.name,x.amount,x.note||'']));
+  expense.forEach(x=>rows.push(['Cố định','Chi',x.name,x.amount,x.note||'']));
+  const csv=rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;
+  a.download=`vi-cua-toi-${currentMonth}.csv`;a.click();
+  URL.revokeObjectURL(url);
+  showToast('✓ Đã xuất CSV — mở bằng Excel');
+};
+
+// ── METHOD HELP TOGGLE (UX#6) ────────────────────────────────
+window.showMethodHelp=function(){
+  const el=document.getElementById('method-help');
+  if(el) el.style.display=el.style.display==='none'?'block':'none';
+};
+

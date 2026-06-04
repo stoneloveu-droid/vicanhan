@@ -212,7 +212,7 @@ export function renderHome({debts, income, expense, ticks, txns, savings, wallet
       el('upcoming-sub').textContent='Không có khoản nào sắp đến hạn';
     }
   }
-  if(el('upcoming-card')) el('upcoming-card').style.display=upcoming.length?'flex':'none';
+  if(el('upcoming-card')) el('upcoming-card').style.visibility=upcoming.length?'visible':'hidden';el('upcoming-card').style.opacity=upcoming.length?'1':'0';
 }
 
 // ── RENDER PAID ───────────────────────────────────────────────
@@ -292,6 +292,7 @@ export function renderTxnPage({txns, savings, walletBase, currentMonth, showAllT
           <div class="txn-cat-ico" style="background:${bg}">${ico}</div>
           <div class="txn-info">
             <div class="txn-name">${t.name}</div>
+            ${t.date?`<div style="font-size:10px;color:var(--sub);font-weight:600">${new Date(t.date).toLocaleDateString('vi-VN',{day:'numeric',month:'numeric'})}</div>`:''}
           </div>
           <div class="txn-amount ${t.type}">${t.type==='in'?'+':'-'}${fmt(t.amount)}</div>`;
         list.appendChild(row);
@@ -542,13 +543,20 @@ function renderBarChart({income, expense, txns, currentMonth}){
   if(!canvas) return;
   const labels=[],dataIn=[],dataOut=[];
   const [cy,cm]=currentMonth.split('-').map(Number);
+  const nowKey=(()=>{const n=new Date();return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}`;})();
+  const fixedInc=income.reduce((s,x)=>s+Number(x.amount),0);
+  const fixedExp=expense.reduce((s,x)=>s+Number(x.amount),0);
   for(let i=5;i>=0;i--){
     const d=new Date(cy,cm-1-i,1);
     const key=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
     labels.push(`T${d.getMonth()+1}`);
     const mt=txns[key]||[];
-    const inc=income.reduce((s,x)=>s+Number(x.amount),0)+mt.filter(t=>t.type==='in').reduce((s,t)=>s+Number(t.amount),0);
-    const exp=expense.reduce((s,x)=>s+Number(x.amount),0)+mt.filter(t=>t.type==='out').reduce((s,t)=>s+Number(t.amount),0);
+    const txnIn =mt.filter(t=>t.type==='in').reduce((s,t)=>s+Number(t.amount),0);
+    const txnOut=mt.filter(t=>t.type==='out').reduce((s,t)=>s+Number(t.amount),0);
+    // Tháng tương lai: không có dữ liệu thực → chỉ hiện 0
+    const isFuture=key>nowKey;
+    const inc=isFuture?0:fixedInc+txnIn;
+    const exp=isFuture?0:fixedExp+txnOut;
     dataIn.push(+(inc/1e6).toFixed(1));
     dataOut.push(+(exp/1e6).toFixed(1));
   }

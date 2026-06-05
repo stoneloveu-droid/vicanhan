@@ -284,8 +284,6 @@ export function renderTxnPage({debts, income, expense, txns, walletBase, current
       });
     }
   }
-  if(el('wallet-base-input')&&!el('wallet-base-input').matches(':focus'))
-    setInputFmt('wallet-base-input',walletBase);
 }
 
 function txnCatIcon(name,type){
@@ -474,14 +472,17 @@ export function renderReport({debts, income, expense, txns, savings, currentMont
   const txnIn       =monthTxns.filter(t=>t.type==='in').reduce((s,t)=>s+Number(t.amount),0);
   const txnOut      =monthTxns.filter(t=>t.type==='out').reduce((s,t)=>s+Number(t.amount),0);
   const totalIn     =totalIncome+txnIn;
-  // FIX: tách fixedExpense để không double-count txnOut trong donut
   const fixedExpense=expense.reduce((s,x)=>s+Number(x.amount),0);
   const totalExpense=fixedExpense+txnOut;
-  const totalSaving =savings.reduce((s,x)=>s+Number(x.amount),0);
+  const totalDebtPay=debts.filter(d=>!d.settled).reduce((s,d)=>s+(d.type==='tc'?tcGetMonthly(d):Number(d.monthly||0)),0);
+  const conDu       =totalIn-totalExpense-totalDebtPay;
 
   if(el('rpt-income'))  el('rpt-income').textContent=fmt(totalIn);
   if(el('rpt-expense')) el('rpt-expense').textContent=fmt(totalExpense);
-  if(el('rpt-saving'))  el('rpt-saving').textContent=fmt(totalSaving);
+  if(el('rpt-saving')){
+    el('rpt-saving').textContent=conDu>=0?fmt(conDu):'-'+fmt(Math.abs(conDu));
+    el('rpt-saving').style.color=conDu>=0?'var(--purple)':'var(--red)';
+  }
 
   // FIX: truyền fixedExpense (không có txnOut) vào donut
   renderDonutChart(fixedExpense, monthTxns);

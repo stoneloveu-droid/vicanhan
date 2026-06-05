@@ -547,3 +547,22 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   cursor: pointer;
 }
 [data-theme="light"] input[type="date"] { color-scheme: light; }
+
+/* Onboarding login link */
+.ob-login-link {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-family: 'Mulish', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  margin-top: 12px;
+  cursor: pointer;
+  text-decoration: underline;
+  opacity: 0.8;
+  width: 100%;
+  text-align: center;
+  padding: 4px;
+}
+/* Debt detail modal */
+#ddetail-content { padding: 4px 0 8px; }

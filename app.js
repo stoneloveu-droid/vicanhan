@@ -161,17 +161,20 @@ onAuthStateChanged(auth,async(user)=>{
   const bnav    =document.getElementById('bnav');
   if(user){
     uid=user.uid;
-    const name =user.displayName||(user.isAnonymous?'Ẩn danh':'Người dùng');
-    const email=user.email||(user.isAnonymous?'Không đăng nhập':'—');
+    const name =user.displayName||(user.isAnonymous?'Ẩn danh (chưa đăng nhập)':'Người dùng');
+    const email=user.email||(user.isAnonymous?'Dữ liệu chỉ lưu trên thiết bị này':'—');
     ['acc-name','acc-name2'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=name;});
     ['acc-email','acc-email-sub'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=email;});
+    // Hiện/ẩn nút đăng nhập cho user ẩn danh
+    const anonBtn=document.getElementById('anon-login-btn');
+    if(anonBtn) anonBtn.style.display=user.isAnonymous?'block':'none';
     const _setAvatar=(id)=>{
       const el=document.getElementById(id);if(!el)return;
       if(!user.isAnonymous&&user.displayName){
         const ini=user.displayName.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
         el.dataset.initials=ini;el.classList.add('has-initials');el.textContent='';
       } else {
-        el.textContent='👤';el.classList.remove('has-initials');delete el.dataset.initials;
+        el.textContent=user.isAnonymous?'🔓':'👤';el.classList.remove('has-initials');delete el.dataset.initials;
       }
     };
     _setAvatar('sett-avatar-emoji');_setAvatar('sett-dd-avatar');
@@ -267,17 +270,76 @@ window.switchPage=function(name){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.ni').forEach(b=>b.classList.remove('active'));
   document.getElementById('page-'+name)?.classList.add('active');
-  document.getElementById('nav-'+name)?.classList.add('active');
+  // nav highlight: tool sub-pages → highlight report tab
+  const navName=['tool-loanbook','tool-interest','tool-saving-calc','tool-schedule','tool-analyze'].includes(name)?'report':name;
+  document.getElementById('nav-'+navName)?.classList.add('active');
   openDetail=null;showAllTxnsFlag=false;
   const s=getState();
-  if(name==='home')     renderHome(s);
-  if(name==='paid')     renderPaid(s);
-  if(name==='txn')      renderTxnPage(s);
-  if(name==='report')   renderTools(s);
-  if(name==='settings') renderSettings(s);
-  if(name==='debt')     renderSettings(s);
-  if(name==='finance')  renderSettings(s);
-  if(name==='tools')    renderTools(s);
+  if(name==='home')               renderHome(s);
+  if(name==='paid')               renderPaid(s);
+  if(name==='txn')                renderTxnPage(s);
+  if(name==='report')             renderTools(s);
+  if(name==='settings')           renderSettings(s);
+  if(name==='debt')               renderSettings(s);
+  if(name==='finance')            renderSettings(s);
+  if(name==='tool-loanbook')      renderLoanBook(s);
+  if(name==='tool-interest')      {} // static form
+  if(name==='tool-saving-calc')   {} // static form
+  if(name==='tool-schedule')      renderSchedulePage(s);
+  if(name==='tool-analyze')       renderAnalyzePage(s);
+};
+
+// ── CARD INTERACTIONS — mở modal chi tiết ────────────────────
+let _detailDebtId=null;
+window.tapTop=function(id){
+  const d=debts.find(x=>x.id===id);if(!d)return;
+  _detailDebtId=id;
+  const ms=ticks[currentMonth]||{};
+  const paid=!!ms[id];
+  const content=document.getElementById('ddetail-content');
+  if(!content)return;
+
+  if(d.type==='td'){
+    const limit=Number(d.limit||0),used=Number(d.used||0),avail=Math.max(0,limit-used);
+    const usedPct=limit?Math.min(100,Math.round(used/limit*100)):0;
+    const barColor=usedPct>80?'var(--red)':usedPct>60?'var(--orange)':'var(--accent)';
+    content.innerHTML=`
+      <div style="font-size:17px;font-weight:900;margin-bottom:4px">💳 ${d.name}</div>
+      <div style="font-size:12px;color:var(--sub);font-weight:600;margin-bottom:16px">Ngày TT: ${d.payDay||'—'} · ${paid?'✅ Đã thanh toán':'⏳ Chưa thanh toán'}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+        <div><div style="font-size:10px;color:var(--sub)">Hạn mức</div><div style="font-size:15px;font-weight:800">${fmt(limit)}</div></div>
+        <div><div style="font-size:10px;color:var(--sub)">Đã dùng</div><div style="font-size:15px;font-weight:800;color:var(--orange)">${fmt(used)}</div></div>
+        <div><div style="font-size:10px;color:var(--sub)">Còn lại</div><div style="font-size:15px;font-weight:800;color:var(--accent)">${fmt(avail)}</div></div>
+        <div><div style="font-size:10px;color:var(--sub)">Trả tháng này</div><div style="font-size:15px;font-weight:800;color:var(--red)">${fmt(d.monthly||0)}</div></div>
+      </div>
+      <div style="background:var(--bg);border-radius:8px;overflow:hidden;height:8px;margin-bottom:6px">
+        <div style="width:${usedPct}%;height:100%;background:${barColor};border-radius:8px;transition:width .4s"></div>
+      </div>
+      <div style="font-size:11px;color:var(--sub);font-weight:600;text-align:center">${usedPct}% đã sử dụng</div>
+      ${d.note?`<div style="margin-top:12px;font-size:12px;color:var(--sub);font-weight:600">📝 ${d.note}</div>`:''}`;
+  } else {
+    const cp=tcCurrentPayment(d);
+    const bal=tcGetDebt(d);
+    const pct=d.totalTerm?Math.round((d.curTerm||0)/d.totalTerm*100):0;
+    content.innerHTML=`
+      <div style="font-size:17px;font-weight:900;margin-bottom:4px">💰 ${d.name}</div>
+      <div style="font-size:12px;color:var(--sub);font-weight:600;margin-bottom:16px">Ngày TT: ${d.payDay||'—'} · ${paid?'✅ Đã thanh toán':'⏳ Chưa thanh toán'}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+        <div><div style="font-size:10px;color:var(--sub)">Trả tháng này</div><div style="font-size:15px;font-weight:800;color:var(--accent)">${fmt(cp.monthly)}</div></div>
+        <div><div style="font-size:10px;color:var(--sub)">Dư nợ còn lại</div><div style="font-size:15px;font-weight:800;color:var(--blue)">${fmt(bal)}</div></div>
+        <div><div style="font-size:10px;color:var(--sub)">Lãi tháng này</div><div style="font-size:15px;font-weight:800;color:var(--orange)">${fmt(cp.interest)}</div></div>
+        <div><div style="font-size:10px;color:var(--sub)">Trả gốc</div><div style="font-size:15px;font-weight:800;color:var(--green)">${fmt(cp.principal)}</div></div>
+        <div><div style="font-size:10px;color:var(--sub)">Tiến độ</div><div style="font-size:15px;font-weight:800">${d.curTerm||0}/${d.totalTerm||0} kỳ</div></div>
+        <div><div style="font-size:10px;color:var(--sub)">Hoàn thành</div><div style="font-size:15px;font-weight:800;color:var(--purple)">${pct}%</div></div>
+      </div>
+      ${d.note?`<div style="margin-top:4px;font-size:12px;color:var(--sub);font-weight:600">📝 ${d.note}</div>`:''}`;
+  }
+  document.getElementById('modal-debt-detail').classList.add('open');
+};
+
+window.editFromDetail=function(){
+  window.closeModal('modal-debt-detail');
+  if(_detailDebtId) window.openDebtEdit(_detailDebtId);
 };
 
 // ── MONTH PICKER CALLBACK ─────────────────────────────────────
@@ -298,17 +360,49 @@ window.shiftMonth=function(delta){
   renderAll();
 };
 window.openMonthPickerApp=function(){
-  // delegate sang ui-utils với currentMonth hiện tại
   window.openMonthPicker(currentMonth);
 };
 
-// ── CARD INTERACTIONS ─────────────────────────────────────────
-window.tapTop=function(id){
-  const el=document.getElementById('dd-'+id);if(!el)return;
-  if(openDetail&&openDetail!==id){const p=document.getElementById('dd-'+openDetail);if(p)p.classList.remove('open');}
-  if(openDetail===id){el.classList.remove('open');openDetail=null;}
-  else{el.classList.add('open');openDetail=id;}
-};
+// ── TOOL PAGE RENDERS ─────────────────────────────────────────
+function renderLoanBook(s){
+  if(typeof renderLoanBookList==='function') renderLoanBookList(s.loanBook||[]);
+}
+function renderSchedulePage(s){
+  const el=document.getElementById('schedule-list');if(!el)return;
+  el.innerHTML='';
+  const today=new Date().getDate();
+  const active=(s.debts||[]).filter(d=>!d.settled&&d.payDay);
+  if(!active.length){el.innerHTML='<div class="empty" style="padding:24px 0">Chưa có ngày thanh toán nào</div>';return;}
+  [...active].sort((a,b)=>(a.payDay||0)-(b.payDay||0)).forEach(d=>{
+    const row=document.createElement('div');row.className='sched-row';
+    const isToday=d.payDay===today,isOverdue=d.payDay<today;
+    const monthly=d.type==='tc'?tcGetMonthly(d):Number(d.monthly||0);
+    row.innerHTML=`<div class="sched-day${isToday?' today':isOverdue?' overdue':''}">${d.payDay}</div>
+      <div><div class="sched-name">${d.name}</div>
+      <div style="font-size:10px;font-weight:600;color:var(--sub)">${isToday?'🔴 Hôm nay':isOverdue?'Đã qua':'Sắp tới'}</div></div>
+      <div class="sched-amt">${fmt(monthly)}</div>`;
+    el.appendChild(row);
+  });
+}
+function renderAnalyzePage(s){
+  if(typeof renderAnalyze==='function') renderAnalyze(s);
+  else {
+    // fallback inline
+    const el=document.getElementById('analyze-content');if(!el)return;
+    const totalIncome=(s.income||[]).reduce((a,x)=>a+Number(x.amount),0);
+    if(!totalIncome){el.innerHTML='<div style="padding:20px;text-align:center;color:var(--sub);font-size:13px;font-weight:700">⚠️ Chưa có dữ liệu thu nhập.<br>Vào <b>Cài đặt → Thu nhập</b> để nhập lương.</div>';return;}
+    const totalDebtPay=(s.debts||[]).filter(d=>!d.settled).reduce((a,d)=>a+(d.type==='tc'?tcGetMonthly(d):Number(d.monthly||0)),0);
+    const debtRatio=Math.round(totalDebtPay/totalIncome*100);
+    const score=debtRatio>50?40:debtRatio>35?65:debtRatio>20?80:95;
+    const scoreColor=score>=80?'var(--accent)':score>=60?'var(--orange)':'var(--red)';
+    el.innerHTML=`<div class="analyze-score" style="padding:20px 0;text-align:center">
+      <div style="font-size:48px;font-weight:900;color:${scoreColor}">${score}</div>
+      <div style="font-size:13px;color:var(--sub);font-weight:700">Điểm sức khoẻ tài chính</div>
+    </div>
+    <div class="analyze-item"><span class="analyze-key">Tỉ lệ nợ / thu nhập</span><span class="analyze-val" style="color:${debtRatio>40?'var(--red)':'var(--accent)'}">${debtRatio}%</span></div>
+    <div style="padding:12px;font-size:12px;color:var(--sub);font-weight:600;background:var(--card);border-radius:12px;margin-top:12px">${debtRatio>50?'⚠️ Tỉ lệ nợ trên 50% — rủi ro cao. Ưu tiên trả nợ lãi cao nhất.':debtRatio>35?'💡 Tỉ lệ nợ khá cao. Hạn chế chi tiêu.':'✅ Tỉ lệ nợ ổn. Duy trì kỷ luật.'}</div>`;
+  }
+}
 
 window.tapCheck=async function(id){
   if(!ticks[currentMonth]) ticks[currentMonth]={};

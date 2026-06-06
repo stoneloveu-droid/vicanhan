@@ -60,7 +60,8 @@ function startRealtimeSync(){
       debts=clone(DEF_DEBTS); income=clone(DEF_INCOME); expense=clone(DEF_EXPENSE);
       ticks={}; txns={}; savings=[]; loanBook=[]; walletBase=0; lastAutoMonth='';
       renderAll();
-      openOnboarding();
+      // Chỉ mở onboarding nếu chưa hoàn thành (tránh reopen khi Google sign-in từ onboarding)
+      if(!window._onboardingDone) openOnboarding();
       return;
     }
     const d=snap.data();
@@ -248,12 +249,13 @@ window.skipOnboardingStep=function(){
   if(onboardingStep===3) window.finishOnboarding();
 };
 window.loginFromOnboarding=function(){
-  // Ẩn overlay onboarding trước
+  window._onboardingDone=true; // ngăn openOnboarding chạy lại sau auth
   const ov=document.getElementById('onboarding-overlay');
   if(ov) ov.classList.remove('open');
-  // Gọi đăng nhập Google — onAuthStateChanged sẽ xử lý phần còn lại
   window.signInGoogle();
 };
+window.finishOnboarding=async function(){
+  window._onboardingDone=true;
   walletBase=readOnboardingAmount('ob-wallet-amount');
   await saveToFirestore();
   document.getElementById('onboarding-overlay')?.classList.remove('open');

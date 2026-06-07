@@ -366,12 +366,12 @@ function renderDebtList(type, debts){
 // ── RENDER TOOLS ──────────────────────────────────────────────
 export function renderTools({debts, income, expense, savings, loanBook}){
   renderSavingList(savings);
-  renderLoanBook(loanBook);
+  renderLoanBookList(loanBook);
   renderSchedule(debts);
   renderAnalyze({debts, income, expense});
 }
 
-function renderLoanBook(items=[]){
+export function renderLoanBookList(items=[]){
   const el=document.getElementById('loanbook-list');if(!el)return;
   el.innerHTML='';
   if(!items.length){

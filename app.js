@@ -16,7 +16,7 @@ import { fmtInput, getInputVal, setInputFmt,
          setOnPickMonth } from "./ui-utils.js";
 import { renderHome, renderPaid, renderCards, renderTxnPage,
          renderSavingList, renderSettings, renderTools,
-         renderReport } from "./render.js";
+         renderReport, renderLoanBookList } from "./render.js";
 
 // ── DEFAULTS ─────────────────────────────────────────────────
 const DEF_DEBTS = [];
@@ -306,7 +306,7 @@ window.switchPage=function(name){
   if(name==='txn')                renderTxnPage(s);
   if(name==='report')             renderTools(s);
   if(name==='settings')           renderSettings(s);
-  if(name==='debt')               renderSettings(s);
+  if(name==='debt')               renderPaid(s);
   if(name==='finance')            renderSettings(s);
   if(name==='tool-loanbook')      renderLoanBook(s);
   if(name==='tool-interest')      {} // static form
@@ -391,7 +391,7 @@ window.openMonthPickerApp=function(){
 
 // ── TOOL PAGE RENDERS ─────────────────────────────────────────
 function renderLoanBook(s){
-  if(typeof renderLoanBookList==='function') renderLoanBookList(s.loanBook||[]);
+  renderLoanBookList(s.loanBook||[]);
 }
 function renderSchedulePage(s){
   const el=document.getElementById('schedule-list');if(!el)return;

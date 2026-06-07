@@ -4,7 +4,7 @@
 // Không import state — nhận dữ liệu qua tham số hoặc từ window.*
 // ─────────────────────────────────────────────────────────────
 
-import { fmt, fmtNoUnit, getML } from "./calc.js";
+import { fmt, fmtNoUnit } from "./calc.js";
 
 // ── FORMAT INPUT ──────────────────────────────────────────────
 export function fmtInput(el){

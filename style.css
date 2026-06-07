@@ -49,6 +49,7 @@ html,body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);
 .scroll{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;
   overscroll-behavior:contain;padding-bottom:calc(var(--safe-b) + var(--bnav-h) + 16px)}
 #page-txn .scroll{padding-bottom:calc(var(--safe-b) + var(--bnav-h) + 88px)}
+#page-paid .scroll{padding-bottom:calc(var(--safe-b) + 60px)}
 
 /* ── PAGE HEADER ─────────────────────────────────────────────── */
 .page-header{
@@ -588,7 +589,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
 /* ── YC2: Debt filter bar cố định dưới ── */
 .debt-filter-bar{
-  position:absolute;bottom:0;left:0;right:0;
+  position:sticky;bottom:0;left:0;right:0;
   display:flex;gap:0;
   background:var(--card2);
   border-top:1px solid var(--border);

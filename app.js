@@ -1099,144 +1099,140 @@ window.showMethodHelp=function(){
 };
 
 // ── DRAG & DROP REORDER DEBTS ────────────────────────────────
-// Mobile-first: dùng touch events, fallback mouse events
-// Chỉ drag được qua drag-handle (icon 2 đường dọc)
 (function initDebtDragSort(){
-  let dragEl=null, cloneEl=null, startY=0, startScrollY=0;
-  let origIndex=-1, curIndex=-1;
-  let sectionType=null; // 'td' | 'tc'
-  let allCards=[];
-  let scrollEl=null;
-  let autoScrollTimer=null;
+  let drag={
+    el:null, clone:null, type:null, cards:[],
+    startClientY:0, startPageY:0,
+    cloneStartTop:0, scrollEl:null,
+    origIdx:-1, curIdx:-1,
+    active:false
+  };
+  let pressTimer=null;
 
-  function getCardList(){ return document.getElementById('card-list'); }
-
-  function getSectionCards(type){
-    const cards=getCardList()?.querySelectorAll('.dcard[data-debt-id]')||[];
-    return [...cards].filter(c=>{
-      const id=c.dataset.debtId;
-      const d=debts.find(x=>x.id===id);
-      return d&&!d.settled&&d.type===type;
-    });
+  /* ── helpers ── */
+  function getCards(type){
+    return [...(document.querySelectorAll('.dcard[data-debt-id]')||[])]
+      .filter(c=>{ const d=debts.find(x=>x.id===c.dataset.debtId); return d&&!d.settled&&d.type===type; });
   }
+  function cardType(el){ const d=debts.find(x=>x.id===el.dataset.debtId); return d?.type||null; }
 
-  function getTypeOfCard(el){
-    const id=el.dataset.debtId;
-    const d=debts.find(x=>x.id===id);
-    return d?.type||null;
-  }
-
-  function createClone(el){
-    const rect=el.getBoundingClientRect();
+  function makeClone(el){
+    const r=el.getBoundingClientRect();
     const cl=el.cloneNode(true);
-    cl.style.cssText=`
-      position:fixed;left:${rect.left}px;top:${rect.top}px;
-      width:${rect.width}px;z-index:9999;
-      pointer-events:none;opacity:0.92;
-      box-shadow:0 12px 40px rgba(0,0,0,.5);
-      transform:scale(1.02);
-      transition:box-shadow .15s,transform .15s;
-      border-radius:16px;
-    `;
+    Object.assign(cl.style,{
+      position:'fixed', left:r.left+'px', top:r.top+'px',
+      width:r.width+'px', margin:'0', zIndex:'9999',
+      pointerEvents:'none', opacity:'0.95',
+      boxShadow:'0 16px 48px rgba(0,0,0,.6)',
+      borderRadius:'16px', transition:'box-shadow .15s',
+      transform:'scale(1.03)', transformOrigin:'center center',
+    });
     document.body.appendChild(cl);
     return cl;
   }
 
-  function getInsertIndex(clientY, cards){
-    for(let i=0;i<cards.length;i++){
-      const rect=cards[i].getBoundingClientRect();
-      const mid=rect.top+rect.height/2;
-      if(clientY<mid) return i;
-    }
-    return cards.length;
-  }
-
-  function applyPlaceholder(cards, idx){
-    cards.forEach((c,i)=>{
-      c.style.transition='transform .18s ease';
-      if(i>=idx && c!==dragEl) c.style.transform='translateY(64px)';
-      else if(i<idx && c!==dragEl) c.style.transform='';
+  /* Dịch chuyển các card khác để nhường chỗ — dùng chiều cao thực */
+  function shiftCards(toIdx){
+    const cardH=drag.el.getBoundingClientRect().height+8; // 8 = gap
+    drag.cards.forEach((c,i)=>{
+      if(c===drag.el){ c.style.visibility='hidden'; return; }
+      c.style.transition='transform .2s cubic-bezier(.25,.8,.25,1)';
+      const srcI=drag.cards.indexOf(c);
+      // Nếu card này ở sau vị trí gốc và trước vị trí mới → dịch lên
+      // Nếu card này ở trước vị trí gốc và sau/bằng vị trí mới → dịch xuống
+      let shift=0;
+      if(drag.origIdx<toIdx){
+        if(i>drag.origIdx && i<=toIdx) shift=-cardH;
+      } else {
+        if(i>=toIdx && i<drag.origIdx) shift=cardH;
+      }
+      c.style.transform=shift?`translateY(${shift}px)`:'';
     });
   }
 
-  function resetCards(cards){
-    cards.forEach(c=>{ c.style.transform=''; c.style.transition=''; });
+  function resetCards(){
+    drag.cards.forEach(c=>{
+      c.style.transform=''; c.style.transition=''; c.style.visibility='';
+    });
   }
 
-  function autoScroll(clientY){
-    const ZONE=80, SPEED=8;
-    const vh=window.innerHeight;
-    if(clientY<ZONE){ scrollEl.scrollTop-=SPEED; }
-    else if(clientY>vh-ZONE){ scrollEl.scrollTop+=SPEED; }
+  function getHoverIdx(clientY){
+    const others=drag.cards.filter(c=>c!==drag.el);
+    for(let i=0;i<others.length;i++){
+      const r=others[i].getBoundingClientRect();
+      if(clientY < r.top+r.height/2){
+        // Map back to full array index
+        return drag.cards.indexOf(others[i]);
+      }
+    }
+    return drag.cards.length-1;
   }
 
-  function onStart(e, el){
-    dragEl=el.closest('.dcard');
-    if(!dragEl) return;
-    sectionType=getTypeOfCard(dragEl);
-    if(!sectionType) return;
-    allCards=getSectionCards(sectionType);
-    origIndex=allCards.indexOf(dragEl);
-    curIndex=origIndex;
-    scrollEl=dragEl.closest('.scroll')||document.documentElement;
+  /* ── start ── */
+  function onStart(clientY, pageY, el){
+    const card=el.closest('.dcard');
+    if(!card) return;
+    const type=cardType(card);
+    if(!type) return;
 
-    const touch=e.touches?.[0]||e;
-    startY=touch.clientY;
-    startScrollY=scrollEl.scrollTop;
+    const cards=getCards(type);
+    const origIdx=cards.indexOf(card);
+    const r=card.getBoundingClientRect();
+    const scrollEl=document.querySelector('#page-debt .scroll')||document.documentElement;
 
-    cloneEl=createClone(dragEl);
-    dragEl.style.opacity='0.3';
+    if(navigator.vibrate) navigator.vibrate(45);
 
-    autoScrollTimer=setInterval(()=>{ if(cloneEl) autoScroll(parseFloat(cloneEl.style.top)||startY); },16);
-
-    e.preventDefault();
+    drag={
+      el:card, clone:null, type, cards,
+      startClientY:clientY, startPageY:pageY,
+      cloneStartTop:r.top,
+      scrollEl, origIdx, curIdx:origIdx, active:true
+    };
+    drag.clone=makeClone(card);
   }
 
-  function onMove(e){
-    if(!dragEl||!cloneEl) return;
-    const touch=e.touches?.[0]||e;
-    const dy=touch.clientY-startY;
-    const rect=dragEl.getBoundingClientRect();
-    cloneEl.style.top=(rect.top+dy+(scrollEl.scrollTop-startScrollY))+'px';
+  /* ── move ── */
+  function onMove(clientY){
+    if(!drag.active||!drag.clone) return;
+    const dy=clientY-drag.startClientY;
+    drag.clone.style.top=(drag.cloneStartTop+dy)+'px';
 
-    const idx=getInsertIndex(touch.clientY, allCards.filter(c=>c!==dragEl));
-    const adjustedIdx=idx>=origIndex?idx:idx; // keep relative
-    curIndex=idx;
-    applyPlaceholder(allCards, idx<origIndex?idx:idx+1);
+    const newIdx=getHoverIdx(clientY);
+    if(newIdx!==drag.curIdx){
+      drag.curIdx=newIdx;
+      shiftCards(newIdx);
+    }
 
-    e.preventDefault();
+    // auto-scroll
+    const ZONE=90, SPEED=10, vh=window.innerHeight;
+    if(clientY<ZONE) drag.scrollEl.scrollTop-=SPEED;
+    else if(clientY>vh-ZONE) drag.scrollEl.scrollTop+=SPEED;
   }
 
+  /* ── end ── */
   async function onEnd(){
-    if(!dragEl||!cloneEl) return;
-    clearInterval(autoScrollTimer);
-    cloneEl.remove(); cloneEl=null;
-    dragEl.style.opacity='';
-    resetCards(allCards);
+    if(!drag.active) return;
+    drag.active=false;
+    clearTimeout(pressTimer); pressTimer=null;
 
-    // Rebuild debts array theo thứ tự mới
-    const insertAt = curIndex > origIndex ? curIndex : curIndex;
-    if(insertAt!==origIndex){
-      const sectionIds=allCards.map(c=>c.dataset.debtId);
-      // Remove dragEl id from sectionIds, insert at new pos
-      const fromId=sectionIds[origIndex];
-      const newSection=[...sectionIds];
-      newSection.splice(origIndex,1);
-      newSection.splice(insertAt,0,fromId);
+    if(drag.clone){ drag.clone.remove(); drag.clone=null; }
+    resetCards();
 
-      // Rebuild full debts array: preserve order of other type + settled
-      const others=debts.filter(d=>d.settled||(d.type!==sectionType));
-      const reordered=newSection.map(id=>debts.find(d=>d.id===id)).filter(Boolean);
-      // Merge: put td before tc, settled last — maintain relative positions
-      // Strategy: replace the block of this sectionType with reordered
+    if(drag.curIdx!==drag.origIdx && drag.curIdx>=0){
+      const ids=drag.cards.map(c=>c.dataset.debtId);
+      const fromId=ids[drag.origIdx];
+      ids.splice(drag.origIdx,1);
+      ids.splice(drag.curIdx,0,fromId);
+
+      // Rebuild debts: thay section này, giữ nguyên loại kia + settled
       const newDebts=[];
-      let sectionInserted=false;
+      let inserted=false;
       for(const d of debts){
         if(d.settled){ newDebts.push(d); continue; }
-        if(d.type===sectionType && !sectionInserted){
-          reordered.forEach(x=>newDebts.push(x));
-          sectionInserted=true;
-        } else if(d.type!==sectionType){
+        if(d.type===drag.type&&!inserted){
+          ids.map(id=>debts.find(x=>x.id===id)).filter(Boolean).forEach(x=>newDebts.push(x));
+          inserted=true;
+        } else if(d.type!==drag.type){
           newDebts.push(d);
         }
       }
@@ -1245,65 +1241,59 @@ window.showMethodHelp=function(){
       await saveToFirestore();
       showToast('✓ Đã sắp xếp');
     }
-    dragEl=null; sectionType=null; allCards=[];
+
+    drag={el:null,clone:null,type:null,cards:[],startClientY:0,startPageY:0,cloneStartTop:0,scrollEl:null,origIdx:-1,curIdx:-1,active:false};
   }
 
-  // ── Long-press 600ms trước khi bắt đầu drag ──
-  let pressTimer=null, pendingHandle=null, pendingEvent=null;
-  let isDragging=false;
+  /* ── Touch events ── */
+  let pendingTouch=null;
 
-  function cancelPress(){
-    clearTimeout(pressTimer);
-    pressTimer=null; pendingHandle=null; pendingEvent=null;
-  }
-
-  document.addEventListener('touchstart',function(e){
+  document.addEventListener('touchstart',e=>{
     const handle=e.target.closest('.drag-handle');
-    if(!handle){cancelPress();return;}
-    pendingHandle=handle; pendingEvent=e;
-    pressTimer=setTimeout(()=>{
-      isDragging=true;
-      // Haptic nếu có
-      if(navigator.vibrate) navigator.vibrate(40);
-      onStart(pendingEvent, pendingHandle);
-    },600);
+    if(!handle){ clearTimeout(pressTimer); return; }
+    const t=e.touches[0];
+    pendingTouch={clientY:t.clientY, pageY:t.pageY, handle};
+    clearTimeout(pressTimer);
+    pressTimer=setTimeout(()=>{ onStart(pendingTouch.clientY, pendingTouch.pageY, pendingTouch.handle); },550);
   },{passive:true});
 
-  document.addEventListener('touchmove',function(e){
-    if(isDragging&&dragEl){
-      onMove(e);
+  document.addEventListener('touchmove',e=>{
+    if(drag.active){
+      onMove(e.touches[0].clientY);
       e.preventDefault();
-    } else if(pressTimer){
-      // Nếu ngón tay di chuyển trước 600ms → hủy long-press
-      const t0=pendingEvent?.touches?.[0];const t1=e.touches?.[0];
-      if(t0&&t1&&(Math.abs(t1.clientX-t0.clientX)>8||Math.abs(t1.clientY-t0.clientY)>8)) cancelPress();
+      return;
+    }
+    // Hủy long-press nếu scroll
+    if(pendingTouch){
+      const t=e.touches[0];
+      if(Math.abs(t.clientY-pendingTouch.clientY)>10||Math.abs(t.clientX-(pendingTouch.clientX||t.clientX))>10){
+        clearTimeout(pressTimer); pressTimer=null;
+      }
     }
   },{passive:false});
 
-  document.addEventListener('touchend',async function(e){
-    cancelPress();
-    if(!isDragging) return;
-    isDragging=false;
+  document.addEventListener('touchend',async e=>{
+    clearTimeout(pressTimer); pressTimer=null; pendingTouch=null;
     await onEnd();
   },{passive:true});
 
-  document.addEventListener('touchcancel',async function(){
-    cancelPress(); isDragging=false; await onEnd();
+  document.addEventListener('touchcancel',async()=>{
+    clearTimeout(pressTimer); pressTimer=null; pendingTouch=null;
+    await onEnd();
   },{passive:true});
 
-  // Mouse fallback (desktop) — long-press 600ms
-  document.addEventListener('mousedown',function(e){
+  /* ── Mouse fallback ── */
+  document.addEventListener('mousedown',e=>{
     const handle=e.target.closest('.drag-handle');
     if(!handle) return;
-    pendingHandle=handle; pendingEvent=e;
     pressTimer=setTimeout(()=>{
-      isDragging=true;
-      onStart(pendingEvent,pendingHandle);
-      const mm=ev=>{if(isDragging) onMove(ev);};
-      const mu=async()=>{cancelPress();isDragging=false;await onEnd();document.removeEventListener('mousemove',mm);document.removeEventListener('mouseup',mu);};
+      onStart(e.clientY, e.pageY, handle);
+      const mm=ev=>onMove(ev.clientY);
+      const mu=async()=>{ await onEnd(); document.removeEventListener('mousemove',mm); document.removeEventListener('mouseup',mu); };
       document.addEventListener('mousemove',mm);
       document.addEventListener('mouseup',mu);
-    },600);
+    },550);
   });
-  document.addEventListener('mouseup',()=>{ if(!isDragging) cancelPress(); });
+  document.addEventListener('mouseup',()=>{ if(!drag.active){ clearTimeout(pressTimer); pressTimer=null; } });
 })();
+

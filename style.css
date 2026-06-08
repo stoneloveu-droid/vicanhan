@@ -683,3 +683,7 @@ button, .seg2-btn, .ni, .sett-row, .dcard-top, .txn-row, .add-row,
 }
 .fin-fixed-btn svg { flex-shrink:0; stroke: var(--sub); }
 .fin-fixed-btn:active { opacity: .7; transform: scale(0.94); }
+
+/* ── Drag active state ── */
+.dcard.drag-ghost { visibility: hidden !important; }
+.dcard[data-debt-id] { will-change: transform; }

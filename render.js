@@ -48,11 +48,12 @@ export function addCard2(wrap,d,ms){
     const used=Number(d.used||0), limit=Number(d.limit);
     const usedPct=limit?Math.min(100,Math.round(used/limit*100)):0;
     const barColor=usedPct>80?'var(--red)':usedPct>60?'var(--orange)':'var(--accent)';
-    const settle=Number(d.settleFee||0);
+    const monthly=Number(d.monthly||0);
+    const feePct=used>0?Math.round(monthly/used*100*10)/10:0;
     usageBarHTML=`<div class="td-usage">
       <div class="td-usage-track"><div class="td-usage-fill" style="width:${usedPct}%;background:${barColor}"></div></div>
       <div class="td-usage-labels"><span>Đã dùng ${fmt(used)} (${usedPct}%)</span><span>Còn ${fmt(Math.max(0,limit-used))}</span></div>
-      ${settle?`<div class="td-settle-fee">Phí tất toán: ${fmt(settle)}</div>`:''}
+      ${feePct>0?`<div class="td-settle-fee">Phí đáo hạn: ${fmt(monthly)} <span style="color:var(--orange);font-weight:800">(${feePct}%/số dư)</span></div>`:''}
     </div>`;
   }
 
@@ -76,8 +77,12 @@ export function addCard2(wrap,d,ms){
   const div=document.createElement('div');
   div.className='dcard'+(paid?' paid':'')+(settled?' settled':'');
   div.id='dc-'+d.id;
+  div.dataset.debtId=d.id;
   div.innerHTML=`
     <div class="dcard-top" onclick="tapTop('${d.id}')">
+      <div class="drag-handle" onclick="event.stopPropagation()" title="Kéo để sắp xếp">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="9" y1="5" x2="9" y2="19"/><line x1="15" y1="5" x2="15" y2="19"/></svg>
+      </div>
       <div class="bank-ico" style="background:${bg}">${abbr}</div>
       <div class="d-info">
         <div class="d-name">${d.name}${settled?'<span class="settled-tag">Tất toán</span>':''}</div>
@@ -114,8 +119,8 @@ export function renderHome({debts, income, expense, ticks, txns, savings, wallet
   const totalOut=totalExpense+txnOut;
   const remain  =totalIn-totalOut-totalDebtPay;
   const totalDebtLeft=debts.filter(d=>!d.settled).reduce((s,d)=>s+(d.type==='tc'?tcGetDebt(d):Number(d.used||0)),0);
-  // wallet = tổng thu - tổng chi (không dùng walletBase nữa)
-  const wallet=totalIn-totalOut;
+  // wallet = tổng thu - tổng chi - tổng nợ phải trả tháng (kể cả chưa tick)
+  const wallet=totalIn-totalOut-totalDebtPay;
 
   if(el('kpi-income'))   el('kpi-income').textContent=fmt(totalIn);
   if(el('kpi-expense'))  el('kpi-expense').textContent=fmt(totalOut);
@@ -169,6 +174,7 @@ export function renderPaid({debts, ticks, currentMonth, currentFilter}){
 
   if(el('ps-total-debt')) el('ps-total-debt').textContent=fmt(totalPay);
   if(el('ps-paid'))       el('ps-paid').textContent=fmt(paidAmt);
+  if(el('ps-unpaid-amt')) el('ps-unpaid-amt').textContent=fmt(totalPay-paidAmt);
   if(el('debt-prog-fill')) el('debt-prog-fill').style.width=pct+'%';
   if(el('debt-prog-pct'))  el('debt-prog-pct').textContent=pct+'%';
 
@@ -463,6 +469,9 @@ export function renderReport({debts, income, expense, txns, savings, currentMont
 
   if(el('rpt-income'))  el('rpt-income').textContent=fmt(totalIn);
   if(el('rpt-expense')) el('rpt-expense').textContent=fmt(totalExpense);
+  if(el('rpt-expense-fixed')) el('rpt-expense-fixed').textContent=fmt(fixedExpense);
+  if(el('rpt-expense-extra')) el('rpt-expense-extra').textContent=fmt(txnOut);
+  if(el('rpt-debt-pay')) el('rpt-debt-pay').textContent=fmt(totalDebtPay);
   if(el('rpt-saving')){
     el('rpt-saving').textContent=conDu>=0?fmt(conDu):'-'+fmt(Math.abs(conDu));
     el('rpt-saving').style.color=conDu>=0?'var(--purple)':'var(--red)';

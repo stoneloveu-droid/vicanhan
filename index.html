@@ -63,7 +63,10 @@
     <div class="report-overview">
       <div class="ro-title" id="rpt-title">Tổng quan tháng</div>
       <div class="ro-row"><div class="ro-dot" style="background:#4CAF50"></div><span>Thu nhập</span><span class="ro-val green" id="rpt-income">—</span></div>
-      <div class="ro-row"><div class="ro-dot" style="background:#F44336"></div><span>Chi tiêu</span><span class="ro-val red" id="rpt-expense">—</span></div>
+      <div class="ro-row ro-sub"><div class="ro-dot" style="background:#F44336"></div><span>Chi phí cố định</span><span class="ro-val red" id="rpt-expense-fixed">—</span></div>
+      <div class="ro-row ro-sub"><div class="ro-dot" style="background:#FF9800"></div><span>Chi tiêu đột xuất</span><span class="ro-val orange" id="rpt-expense-extra">—</span></div>
+      <div class="ro-row"><div class="ro-dot" style="background:#F44336"></div><span>Tổng chi tiêu</span><span class="ro-val red" id="rpt-expense">—</span></div>
+      <div class="ro-row"><div class="ro-dot" style="background:#57C8FF"></div><span>Nợ phải trả</span><span class="ro-val blue" id="rpt-debt-pay">—</span></div>
       <div class="ro-row"><div class="ro-dot" style="background:#C57BFF"></div><span>Còn dư</span><span class="ro-val purple" id="rpt-saving">—</span></div>
     </div>
     <div class="report-card">
@@ -102,12 +105,11 @@
         <div class="pci-title">Tiến độ trả nợ tháng này</div>
         <div class="pci-row"><span>Đã thanh toán</span><span class="pci-val green" id="prog-paid-amt">—</span></div>
         <div class="pci-row"><span>Tổng cần trả</span><span class="pci-val" id="prog-total-amt">—</span></div>
+        <div class="pci-row"><span>Chưa thanh toán</span><span class="pci-val red" id="ps-unpaid-amt">—</span></div>
+        <div class="pci-divider"></div>
+        <div class="pci-row"><span>Tổng cần trả T/N</span><span class="pci-val red" id="ps-total-debt">—</span></div>
+        <div class="pci-row"><span>Tổng dư nợ</span><span class="pci-val blue" id="kpi-debt-total">—</span></div>
       </div>
-    </div>
-    <div class="debt-sum-row">
-      <div class="dsr-item"><div class="dsr-lbl">Tổng cần trả tháng này</div><div class="dsr-val red" id="ps-total-debt">—</div></div>
-      <div class="dsr-sep"></div>
-      <div class="dsr-item"><div class="dsr-lbl">Tổng dư nợ</div><div class="dsr-val" id="kpi-debt-total">—</div></div>
     </div>
     <span id="ps-paid" style="display:none"></span>
     <div id="card-list"></div>
@@ -374,7 +376,7 @@
 
 <div class="modal-bg" id="modal-share-txn" onclick="closeMBg('modal-share-txn',event)"><div class="msheet"><div class="mhandle"></div>
   <div class="mtitle">📤 Báo cáo chi tiêu</div>
-  <textarea id="share-txn-text" style="width:100%;min-height:200px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;font-family:'Mulish',sans-serif;font-size:13px;font-weight:600;color:var(--text);resize:none;box-sizing:border-box;line-height:1.6" readonly></textarea>
+  <textarea id="share-txn-text" style="width:100%;min-height:320px;max-height:50vh;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;font-family:'Mulish',sans-serif;font-size:13px;font-weight:600;color:var(--text);resize:none;box-sizing:border-box;line-height:1.6" readonly></textarea>
   <div class="mbtns" style="margin-top:12px">
     <button class="mbtn mbtn-cancel" onclick="closeModal('modal-share-txn')">Đóng</button>
     <button class="mbtn mbtn-save" onclick="copyTxnReport()">📋 Copy</button>
@@ -412,14 +414,12 @@
   <div id="md-td-fields">
     <div class="fg"><label>Hạn mức thẻ (đ)</label><input id="md-limit" type="text" inputmode="numeric" oninput="fmtInput(this)" placeholder="VD: 50,000,000"></div>
     <div class="fg"><label>Số dư đang nợ / đã dùng (đ)</label><input id="md-used" type="text" inputmode="numeric" oninput="fmtInput(this);calcTdFields()" placeholder="VD: 12,000,000"></div>
-    <div class="fg"><label>Lãi suất thẻ (%/tháng) <span style="font-size:10px;color:var(--sub);font-weight:600">— tự tính phí</span></label><input id="md-td-rate" type="number" inputmode="decimal" step="0.01" placeholder="VD: 3.5" onchange="calcTdFields()"></div>
     <div class="fg">
       <label>Phí thanh toán tối thiểu / tháng (đ)
-        <span style="font-size:10px;color:var(--sub);font-weight:600;display:block;margin-top:2px">Tự động tính từ lãi suất, hoặc nhập thủ công</span>
+        <span style="font-size:10px;color:var(--sub);font-weight:600;display:block;margin-top:2px">Nhập thủ công hoặc để trống để tự tính</span>
       </label>
       <input id="md-monthly-td" type="text" inputmode="numeric" oninput="fmtInput(this)" placeholder="VD: 216,000">
     </div>
-    <div class="fg"><label>Phí tất toán sớm (đ) <span style="font-size:10px;color:var(--sub);font-weight:600">(để trống nếu không có)</span></label><input id="md-settle-fee" type="text" inputmode="numeric" oninput="fmtInput(this)" placeholder="Không bắt buộc"></div>
     <div class="fg"><label>Ghi chú</label><input id="md-note-td" type="text" placeholder="VD: Visa Platinum"></div>
   </div>
   <div id="md-tc-fields" style="display:none">

@@ -606,3 +606,64 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
 /* ── YC4: Avatar Google ── */
 #sett-avatar-emoji{overflow:hidden;display:flex;align-items:center;justify-content:center}
+
+/* ── GLOBAL: chặn bôi chữ ── */
+* { -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+input, textarea, [contenteditable] { -webkit-user-select: text !important; user-select: text !important; }
+
+/* ── RIPPLE effect ── */
+.ripple-host { position: relative; overflow: hidden; }
+@keyframes rippleAnim {
+  to { transform: scale(4); opacity: 0; }
+}
+.ripple-circle {
+  position: absolute; border-radius: 50%;
+  width: 60px; height: 60px; margin-top: -30px; margin-left: -30px;
+  background: rgba(255,255,255,0.18);
+  animation: rippleAnim 0.5s linear;
+  pointer-events: none; z-index: 99;
+}
+
+/* ── Button press scale ── */
+button:active, .seg2-btn:active, .ni:active, .sett-row:active,
+.dcard-top:active, .txn-row:active, .add-row:active, .mpbtn:active,
+.txn-act:active, .chip:active, .tp-btn:active, .tt-btn:active,
+.mnav-btn:active, .month-chip:active, .icon-btn:active, .chk:active,
+.settled-toggle:active, .save-row:active, .sched-row:active {
+  transform: scale(0.96);
+  transition: transform 0.1s ease;
+}
+button, .seg2-btn, .ni, .sett-row, .dcard-top, .txn-row, .add-row,
+.mpbtn, .txn-act, .chip, .tp-btn, .tt-btn, .mnav-btn, .month-chip,
+.icon-btn, .chk, .settled-toggle, .save-row {
+  transition: transform 0.15s ease, background 0.15s ease, opacity 0.15s ease;
+}
+
+/* ── Tổng quan tháng — hàng phụ ── */
+.ro-sub { padding-left: 14px; opacity: 0.85; }
+.ro-val.blue { color: var(--blue); }
+.ro-val.orange { color: var(--orange); }
+
+/* ── Prog-card divider ── */
+.pci-divider {
+  height: 1px; background: var(--border);
+  margin: 6px 0; width: 100%;
+}
+.pci-val.red { color: var(--red); }
+.pci-val.blue { color: var(--blue); }
+
+/* ── DRAG HANDLE ── */
+.drag-handle {
+  display: flex; align-items: center; justify-content: center;
+  width: 28px; height: 44px; flex-shrink: 0;
+  color: var(--sub); opacity: 0.45;
+  cursor: grab; touch-action: none;
+  border-radius: 8px;
+  margin-right: 2px;
+  transition: opacity .15s, color .15s;
+}
+.drag-handle:active { cursor: grabbing; opacity: 0.9; color: var(--accent); }
+.drag-handle:hover  { opacity: 0.75; color: var(--text); }
+
+/* Khi đang drag — card gốc mờ đi */
+.dcard.dragging { opacity: 0.25 !important; }

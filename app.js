@@ -351,12 +351,13 @@ window.tapTop=function(id){
       <div style="font-size:17px;font-weight:900;margin-bottom:4px">💰 ${d.name}</div>
       <div style="font-size:12px;color:var(--sub);font-weight:600;margin-bottom:16px">Ngày TT: ${d.payDay||'—'} · ${paid?'✅ Đã thanh toán':'⏳ Chưa thanh toán'}</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+        <div><div style="font-size:10px;color:var(--sub)">Vốn gốc ban đầu</div><div style="font-size:15px;font-weight:800">${fmt(d.principal||0)}</div></div>
         <div><div style="font-size:10px;color:var(--sub)">Trả tháng này</div><div style="font-size:15px;font-weight:800;color:var(--accent)">${fmt(cp.monthly)}</div></div>
         <div><div style="font-size:10px;color:var(--sub)">Dư nợ còn lại</div><div style="font-size:15px;font-weight:800;color:var(--blue)">${fmt(bal)}</div></div>
         <div><div style="font-size:10px;color:var(--sub)">Lãi tháng này</div><div style="font-size:15px;font-weight:800;color:var(--orange)">${fmt(cp.interest)}</div></div>
         <div><div style="font-size:10px;color:var(--sub)">Trả gốc</div><div style="font-size:15px;font-weight:800;color:var(--green)">${fmt(cp.principal)}</div></div>
         <div><div style="font-size:10px;color:var(--sub)">Tiến độ</div><div style="font-size:15px;font-weight:800">${d.curTerm||0}/${d.totalTerm||0} kỳ</div></div>
-        <div><div style="font-size:10px;color:var(--sub)">Hoàn thành</div><div style="font-size:15px;font-weight:800;color:var(--purple)">${pct}%</div></div>
+        <div style="grid-column:1/-1"><div style="font-size:10px;color:var(--sub)">Hoàn thành</div><div style="font-size:15px;font-weight:800;color:var(--purple)">${pct}%</div></div>
       </div>
       ${d.note?`<div style="margin-top:4px;font-size:12px;color:var(--sub);font-weight:600">📝 ${d.note}</div>`:''}`;
   }
@@ -1039,6 +1040,25 @@ document.addEventListener('DOMContentLoaded',()=>{
   initAccent();
   const th=localStorage.getItem('vn_theme')||'dark';
   setTheme(th);
+
+  // ── RIPPLE: tạo hiệu ứng ripple cho tất cả nút tương tác ──
+  const RIPPLE_SELS=[
+    'button','.seg2-btn','.ni','.sett-row','.add-row','.mpbtn',
+    '.txn-act','.chip','.tp-btn','.tt-btn','.mnav-btn','.month-chip',
+    '.icon-btn','.dcard-top','.settled-toggle','.txn-row'
+  ].join(',');
+  document.body.addEventListener('pointerdown',(e)=>{
+    const el=e.target.closest(RIPPLE_SELS);
+    if(!el) return;
+    el.classList.add('ripple-host');
+    const r=document.createElement('span');
+    r.className='ripple-circle';
+    const rect=el.getBoundingClientRect();
+    r.style.left=(e.clientX-rect.left)+'px';
+    r.style.top=(e.clientY-rect.top)+'px';
+    el.appendChild(r);
+    setTimeout(()=>r.remove(),550);
+  },{passive:true});
 });
 
 // ── EXPORT CSV (UX#9) ─────────────────────────────────────────
@@ -1065,3 +1085,178 @@ window.showMethodHelp=function(){
   const el=document.getElementById('method-help');
   if(el) el.style.display=el.style.display==='none'?'block':'none';
 };
+
+// ── DRAG & DROP REORDER DEBTS ────────────────────────────────
+// Mobile-first: dùng touch events, fallback mouse events
+// Chỉ drag được qua drag-handle (icon 2 đường dọc)
+(function initDebtDragSort(){
+  let dragEl=null, cloneEl=null, startY=0, startScrollY=0;
+  let origIndex=-1, curIndex=-1;
+  let sectionType=null; // 'td' | 'tc'
+  let allCards=[];
+  let scrollEl=null;
+  let autoScrollTimer=null;
+
+  function getCardList(){ return document.getElementById('card-list'); }
+
+  function getSectionCards(type){
+    const cards=getCardList()?.querySelectorAll('.dcard[data-debt-id]')||[];
+    return [...cards].filter(c=>{
+      const id=c.dataset.debtId;
+      const d=debts.find(x=>x.id===id);
+      return d&&!d.settled&&d.type===type;
+    });
+  }
+
+  function getTypeOfCard(el){
+    const id=el.dataset.debtId;
+    const d=debts.find(x=>x.id===id);
+    return d?.type||null;
+  }
+
+  function createClone(el){
+    const rect=el.getBoundingClientRect();
+    const cl=el.cloneNode(true);
+    cl.style.cssText=`
+      position:fixed;left:${rect.left}px;top:${rect.top}px;
+      width:${rect.width}px;z-index:9999;
+      pointer-events:none;opacity:0.92;
+      box-shadow:0 12px 40px rgba(0,0,0,.5);
+      transform:scale(1.02);
+      transition:box-shadow .15s,transform .15s;
+      border-radius:16px;
+    `;
+    document.body.appendChild(cl);
+    return cl;
+  }
+
+  function getInsertIndex(clientY, cards){
+    for(let i=0;i<cards.length;i++){
+      const rect=cards[i].getBoundingClientRect();
+      const mid=rect.top+rect.height/2;
+      if(clientY<mid) return i;
+    }
+    return cards.length;
+  }
+
+  function applyPlaceholder(cards, idx){
+    cards.forEach((c,i)=>{
+      c.style.transition='transform .18s ease';
+      if(i>=idx && c!==dragEl) c.style.transform='translateY(64px)';
+      else if(i<idx && c!==dragEl) c.style.transform='';
+    });
+  }
+
+  function resetCards(cards){
+    cards.forEach(c=>{ c.style.transform=''; c.style.transition=''; });
+  }
+
+  function autoScroll(clientY){
+    const ZONE=80, SPEED=8;
+    const vh=window.innerHeight;
+    if(clientY<ZONE){ scrollEl.scrollTop-=SPEED; }
+    else if(clientY>vh-ZONE){ scrollEl.scrollTop+=SPEED; }
+  }
+
+  function onStart(e, el){
+    dragEl=el.closest('.dcard');
+    if(!dragEl) return;
+    sectionType=getTypeOfCard(dragEl);
+    if(!sectionType) return;
+    allCards=getSectionCards(sectionType);
+    origIndex=allCards.indexOf(dragEl);
+    curIndex=origIndex;
+    scrollEl=dragEl.closest('.scroll')||document.documentElement;
+
+    const touch=e.touches?.[0]||e;
+    startY=touch.clientY;
+    startScrollY=scrollEl.scrollTop;
+
+    cloneEl=createClone(dragEl);
+    dragEl.style.opacity='0.3';
+
+    autoScrollTimer=setInterval(()=>{ if(cloneEl) autoScroll(parseFloat(cloneEl.style.top)||startY); },16);
+
+    e.preventDefault();
+  }
+
+  function onMove(e){
+    if(!dragEl||!cloneEl) return;
+    const touch=e.touches?.[0]||e;
+    const dy=touch.clientY-startY;
+    const rect=dragEl.getBoundingClientRect();
+    cloneEl.style.top=(rect.top+dy+(scrollEl.scrollTop-startScrollY))+'px';
+
+    const idx=getInsertIndex(touch.clientY, allCards.filter(c=>c!==dragEl));
+    const adjustedIdx=idx>=origIndex?idx:idx; // keep relative
+    curIndex=idx;
+    applyPlaceholder(allCards, idx<origIndex?idx:idx+1);
+
+    e.preventDefault();
+  }
+
+  async function onEnd(){
+    if(!dragEl||!cloneEl) return;
+    clearInterval(autoScrollTimer);
+    cloneEl.remove(); cloneEl=null;
+    dragEl.style.opacity='';
+    resetCards(allCards);
+
+    // Rebuild debts array theo thứ tự mới
+    const insertAt = curIndex > origIndex ? curIndex : curIndex;
+    if(insertAt!==origIndex){
+      const sectionIds=allCards.map(c=>c.dataset.debtId);
+      // Remove dragEl id from sectionIds, insert at new pos
+      const fromId=sectionIds[origIndex];
+      const newSection=[...sectionIds];
+      newSection.splice(origIndex,1);
+      newSection.splice(insertAt,0,fromId);
+
+      // Rebuild full debts array: preserve order of other type + settled
+      const others=debts.filter(d=>d.settled||(d.type!==sectionType));
+      const reordered=newSection.map(id=>debts.find(d=>d.id===id)).filter(Boolean);
+      // Merge: put td before tc, settled last — maintain relative positions
+      // Strategy: replace the block of this sectionType with reordered
+      const newDebts=[];
+      let sectionInserted=false;
+      for(const d of debts){
+        if(d.settled){ newDebts.push(d); continue; }
+        if(d.type===sectionType && !sectionInserted){
+          reordered.forEach(x=>newDebts.push(x));
+          sectionInserted=true;
+        } else if(d.type!==sectionType){
+          newDebts.push(d);
+        }
+      }
+      debts.length=0; newDebts.forEach(d=>debts.push(d));
+      renderAll();
+      await saveToFirestore();
+      showToast('✓ Đã sắp xếp');
+    }
+    dragEl=null; sectionType=null; allCards=[];
+  }
+
+  // Attach listeners via delegation on #card-list
+  document.addEventListener('touchstart',function(e){
+    const handle=e.target.closest('.drag-handle');
+    if(!handle) return;
+    onStart(e,handle);
+  },{passive:false});
+  document.addEventListener('touchmove',function(e){
+    if(!dragEl) return;
+    onMove(e);
+  },{passive:false});
+  document.addEventListener('touchend',onEnd,{passive:true});
+  document.addEventListener('touchcancel',onEnd,{passive:true});
+
+  // Mouse fallback (desktop)
+  document.addEventListener('mousedown',function(e){
+    const handle=e.target.closest('.drag-handle');
+    if(!handle) return;
+    onStart(e,handle);
+    const mm=ev=>onMove(ev);
+    const mu=async()=>{ await onEnd(); document.removeEventListener('mousemove',mm); document.removeEventListener('mouseup',mu); };
+    document.addEventListener('mousemove',mm);
+    document.addEventListener('mouseup',mu);
+  });
+})();

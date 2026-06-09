@@ -49,7 +49,7 @@ html,body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);
 .scroll{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;
   overscroll-behavior:contain;padding-bottom:calc(var(--safe-b) + var(--bnav-h) + 80px)}
 #page-txn .scroll{padding-bottom:calc(var(--safe-b) + var(--bnav-h) + 140px)}
-#page-paid .scroll{padding-bottom:calc(var(--safe-b) + 100px)}
+#page-paid .scroll{padding-bottom:calc(var(--safe-b) + var(--bnav-h) + 80px)}
 
 /* ── PAGE HEADER ─────────────────────────────────────────────── */
 .page-header{

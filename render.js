@@ -48,7 +48,16 @@ export function addCard2(wrap,d,ms){
     const m=Number(d.monthly||0);
     const feePct=used>0?Math.round(m/used*100*10)/10:0;
     const feeLbl=feePct>0?`Phí ${feePct}% · `:'';
-    sub=`${feeLbl}Ngày ${d.payDay||'—'}${d.note?` · ${d.note}`:''}`;
+    const _today=new Date().getDate();
+    const _daysLeft=d.payDay?(d.payDay-_today):null;
+    let _dueLbl='';
+    if(_daysLeft!==null){
+      if(_daysLeft<0)       _dueLbl=`<span style="color:var(--red);font-weight:900"> · ⚠️ Quá hạn ${Math.abs(_daysLeft)} ngày</span>`;
+      else if(_daysLeft===0)_dueLbl=`<span style="color:var(--red);font-weight:900"> · 🔴 Đến hạn HÔM NAY</span>`;
+      else if(_daysLeft<=3) _dueLbl=`<span style="color:var(--orange);font-weight:900"> · ⏰ Còn ${_daysLeft} ngày</span>`;
+      else                  _dueLbl=`<span style="color:var(--sub)"> · Ngày ${d.payDay}</span>`;
+    }
+    sub=`${feeLbl}${_dueLbl}${d.note?` · ${d.note}`:''}`;
   } else {
     sub=`${d.note||''} · Ngày ${d.payDay||'—'}`;
   }
@@ -171,6 +180,11 @@ export function renderHome({debts, income, expense, ticks, txns, savings, wallet
     }
   }
   if(el('upcoming-card')){el('upcoming-card').style.visibility=upcoming.length?'visible':'hidden';el('upcoming-card').style.opacity=upcoming.length?'1':'0';}
+  // Banner cảnh báo tháng cũ
+  const _realMonth=(()=>{const n=new Date();return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}`;})();
+  const _isPast = currentMonth !== _realMonth;
+  const _bannerHome = document.getElementById('past-month-banner-home');
+  if(_bannerHome) _bannerHome.style.display = _isPast ? 'block' : 'none';
 }
 
 // ── RENDER PAID ───────────────────────────────────────────────
@@ -286,6 +300,11 @@ export function renderTxnPage({debts, income, expense, txns, walletBase, current
       });
     }
   }
+  // Banner cảnh báo tháng cũ
+  const _realMonthT=(()=>{const n=new Date();return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}`;})();
+  const _isPastT = currentMonth !== _realMonthT;
+  const _bannerTxn = document.getElementById('past-month-banner');
+  if(_bannerTxn) _bannerTxn.style.display = _isPastT ? 'block' : 'none';
 }
 
 function txnCatIcon(name,type){
@@ -396,13 +415,55 @@ export function renderLoanBookList(items=[]){
     el.innerHTML=`<div style="padding:14px;text-align:center;color:var(--sub);font-size:12px;font-weight:700">Chưa có ghi nợ</div>`;
     return;
   }
-  items.forEach((it,i)=>{
-    const row=document.createElement('div');row.className='save-row';
-    row.innerHTML=`<div class="save-row-left"><div class="save-row-name">${it.name}</div><div class="save-row-date">${it.note||it.date||''}</div></div>
-      <div style="display:flex;align-items:center;gap:8px"><div class="save-row-amt">${fmt(it.amount)}</div>
-      <button class="s-del" onclick="window.openLoanBookModal('${it.id}')">✎</button></div>`;
-    el.appendChild(row);
-  });
+  // Tách: chưa thu / đã thu
+  const pending   = items.filter(x=>!x.collected);
+  const collected = items.filter(x=> x.collected);
+  const totalPending   = pending.reduce((s,x)=>s+Number(x.amount),0);
+  const totalCollected = collected.reduce((s,x)=>s+Number(x.amount),0);
+
+  // Header tổng
+  const summary=document.createElement('div');
+  summary.style='display:flex;gap:10px;margin-bottom:10px';
+  summary.innerHTML=`
+    <div style="flex:1;background:var(--card2);border-radius:12px;padding:10px 12px">
+      <div style="font-size:10px;color:var(--sub);font-weight:700">Chưa thu</div>
+      <div style="font-size:14px;font-weight:900;color:var(--orange)">${fmt(totalPending)}</div>
+    </div>
+    <div style="flex:1;background:var(--card2);border-radius:12px;padding:10px 12px">
+      <div style="font-size:10px;color:var(--sub);font-weight:700">Đã thu</div>
+      <div style="font-size:14px;font-weight:900;color:var(--accent)">${fmt(totalCollected)}</div>
+    </div>`;
+  el.appendChild(summary);
+
+  const renderGroup=(list,title)=>{
+    if(!list.length) return;
+    const lbl=document.createElement('div');
+    lbl.style='font-size:10px;font-weight:800;color:var(--sub);padding:6px 0 4px;text-transform:uppercase;letter-spacing:.5px';
+    lbl.textContent=title;
+    el.appendChild(lbl);
+    list.forEach(it=>{
+      const row=document.createElement('div');row.className='save-row';
+      const isCollected=!!it.collected;
+      row.style=isCollected?'opacity:0.55':'';
+      row.innerHTML=`
+        <div class="save-row-left">
+          <div class="save-row-name" style="${isCollected?'text-decoration:line-through':''}">${it.name}</div>
+          <div class="save-row-date">${it.note||''} ${it.date?'· '+it.date:''} ${it.collectedDate?'· Thu: '+it.collectedDate:''}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <div class="save-row-amt" style="color:${isCollected?'var(--sub)':'var(--orange)'}">${fmt(it.amount)}</div>
+          <button onclick="window.toggleLoanCollected('${it.id}')"
+            style="padding:5px 10px;border-radius:10px;border:1px solid var(--border);background:${isCollected?'var(--card)':'var(--accent)'};color:${isCollected?'var(--sub)':'var(--bg)'};font-size:11px;font-weight:800;cursor:pointer">
+            ${isCollected?'↩':'✓'}
+          </button>
+          <button class="s-del" onclick="window.openLoanBookModal('${it.id}')">✎</button>
+        </div>`;
+      el.appendChild(row);
+    });
+  };
+
+  renderGroup(pending,'⏳ Chưa thu');
+  renderGroup(collected,'✅ Đã thu');
 }
 
 function renderSchedule(debts){
@@ -422,7 +483,7 @@ function renderSchedule(debts){
   });
 }
 
-function renderAnalyze({debts, income, expense}){
+export function renderAnalyze({debts, income, expense}){
   const el=document.getElementById('analyze-content');if(!el)return;
   const totalIncome  =income.reduce((s,x)=>s+Number(x.amount),0);
   const totalDebtPay =debts.filter(d=>!d.settled).reduce((s,d)=>s+(d.type==='tc'?tcGetMonthly(d):Number(d.monthly||0)),0);

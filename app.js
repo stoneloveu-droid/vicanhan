@@ -16,7 +16,7 @@ import { fmtInput, getInputVal, setInputFmt,
          setOnPickMonth } from "./ui-utils.js";
 import { renderHome, renderPaid, renderCards, renderTxnPage,
          renderSavingList, renderSettings, renderTools,
-         renderReport, renderLoanBookList } from "./render.js";
+         renderReport, renderLoanBookList, renderAnalyze } from "./render.js";
 
 // ── DEFAULTS ─────────────────────────────────────────────────
 const DEF_DEBTS = [];
@@ -37,6 +37,7 @@ let walletHidden=false;
 let showAllTxnsFlag=false;
 let isSavingToFirestore=false;
 let onboardingStep=1;
+let currentPage = 'home'; // track trang đang hiển thị
 
 function clone(x){return JSON.parse(JSON.stringify(x));}
 function initMonth(){
@@ -233,7 +234,7 @@ function showOnboardingStep(step){
 }
 function openOnboarding(){
   showOnboardingStep(1);
-  setTimeout(()=>document.getElementById('ob-income-amount')?.focus(),250);
+  requestAnimationFrame(()=>requestAnimationFrame(()=>document.getElementById('ob-income-amount')?.focus()));
 }
 function readOnboardingAmount(id){
   const el=document.getElementById(id);
@@ -282,17 +283,23 @@ window.finishOnboarding=async function(){
 
 function renderAll(){
   const s=getState();
-  renderHome(s);
-  renderPaid(s);
-  renderTxnPage(s);
-  renderSettings(s);
-  renderTools(s);
-  renderReport(s);
+  // Luôn render trang đang mở để phản ánh thay đổi ngay lập tức
+  if(currentPage==='home')               renderHome(s);
+  else if(currentPage==='paid'||currentPage==='debt') renderPaid(s);
+  else if(currentPage==='txn')           renderTxnPage(s);
+  else if(currentPage==='settings'||currentPage==='finance') renderSettings(s);
+  else if(currentPage==='report')        renderTools(s);
+  else if(currentPage==='tool-loanbook') renderLoanBookList(s.loanBook||[]);
+  else if(currentPage==='tool-schedule') renderSchedulePage(s);
+  else if(currentPage==='tool-analyze')  renderAnalyzePage(s);
+  // Luôn cập nhật badge nợ và report (nhẹ, không tốn CPU)
   updateDebtNavBadge();
+  renderReport(s);
 }
 
 // ── SWITCH PAGE ───────────────────────────────────────────────
 window.switchPage=function(name){
+  currentPage = name;
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.ni').forEach(b=>b.classList.remove('active'));
   document.getElementById('page-'+name)?.classList.add('active');
@@ -300,6 +307,11 @@ window.switchPage=function(name){
   const navName=['tool-loanbook','tool-interest','tool-saving-calc','tool-schedule','tool-analyze'].includes(name)?'report':name;
   document.getElementById('nav-'+navName)?.classList.add('active');
   openDetail=null;showAllTxnsFlag=false;
+  // Reset txn search khi rời tab
+  const _tsEl=document.getElementById('txn-search');
+  const _tfEl=document.getElementById('txn-type-filter');
+  if(_tsEl) _tsEl.value='';
+  if(_tfEl) _tfEl.value='all';
   const s=getState();
   if(name==='home')               renderHome(s);
   if(name==='paid')               renderPaid(s);
@@ -359,7 +371,8 @@ window.tapTop=function(id){
         <div><div style="font-size:10px;color:var(--sub)">Tiến độ</div><div style="font-size:15px;font-weight:800">${d.curTerm||0}/${d.totalTerm||0} kỳ</div></div>
         <div style="grid-column:1/-1"><div style="font-size:10px;color:var(--sub)">Hoàn thành</div><div style="font-size:15px;font-weight:800;color:var(--purple)">${pct}%</div></div>
       </div>
-      ${d.note?`<div style="margin-top:4px;font-size:12px;color:var(--sub);font-weight:600">📝 ${d.note}</div>`:''}`;
+      ${d.note?`<div style="margin-top:4px;font-size:12px;color:var(--sub);font-weight:600">📝 ${d.note}</div>`:''}
+      ${!d.settled?`<button onclick="window.settleDebtEarly()" style="margin-top:16px;width:100%;padding:12px;background:var(--card2);border:1px solid var(--border);border-radius:14px;color:var(--orange);font-family:'Mulish',sans-serif;font-size:13px;font-weight:800;cursor:pointer">🏁 Tất toán sớm khoản này</button>`:''}`;
   }
   document.getElementById('modal-debt-detail').classList.add('open');
 };
@@ -367,6 +380,17 @@ window.tapTop=function(id){
 window.editFromDetail=function(){
   window.closeModal('modal-debt-detail');
   if(_detailDebtId) window.openDebtEdit(_detailDebtId);
+};
+
+window.settleDebtEarly=function(){
+  const d=debts.find(x=>x.id===_detailDebtId);if(!d)return;
+  confirmAction(`Tất toán sớm khoản "${d.name}"? Không thể hoàn tác.`,async()=>{
+    d.settled=true;
+    window.closeModal('modal-debt-detail');
+    await saveToFirestore();
+    renderAll();
+    showToast('🎉 Đã tất toán '+d.name);
+  });
 };
 
 // ── MONTH PICKER CALLBACK ─────────────────────────────────────
@@ -412,23 +436,7 @@ function renderSchedulePage(s){
   });
 }
 function renderAnalyzePage(s){
-  if(typeof renderAnalyze==='function') renderAnalyze(s);
-  else {
-    // fallback inline
-    const el=document.getElementById('analyze-content');if(!el)return;
-    const totalIncome=(s.income||[]).reduce((a,x)=>a+Number(x.amount),0);
-    if(!totalIncome){el.innerHTML='<div style="padding:20px;text-align:center;color:var(--sub);font-size:13px;font-weight:700">⚠️ Chưa có dữ liệu thu nhập.<br>Vào <b>Cài đặt → Thu nhập</b> để nhập lương.</div>';return;}
-    const totalDebtPay=(s.debts||[]).filter(d=>!d.settled).reduce((a,d)=>a+(d.type==='tc'?tcGetMonthly(d):Number(d.monthly||0)),0);
-    const debtRatio=Math.round(totalDebtPay/totalIncome*100);
-    const score=debtRatio>50?40:debtRatio>35?65:debtRatio>20?80:95;
-    const scoreColor=score>=80?'var(--accent)':score>=60?'var(--orange)':'var(--red)';
-    el.innerHTML=`<div class="analyze-score" style="padding:20px 0;text-align:center">
-      <div style="font-size:48px;font-weight:900;color:${scoreColor}">${score}</div>
-      <div style="font-size:13px;color:var(--sub);font-weight:700">Điểm sức khoẻ tài chính</div>
-    </div>
-    <div class="analyze-item"><span class="analyze-key">Tỉ lệ nợ / thu nhập</span><span class="analyze-val" style="color:${debtRatio>40?'var(--red)':'var(--accent)'}">${debtRatio}%</span></div>
-    <div style="padding:12px;font-size:12px;color:var(--sub);font-weight:600;background:var(--card);border-radius:12px;margin-top:12px">${debtRatio>50?'⚠️ Tỉ lệ nợ trên 50% — rủi ro cao. Ưu tiên trả nợ lãi cao nhất.':debtRatio>35?'💡 Tỉ lệ nợ khá cao. Hạn chế chi tiêu.':'✅ Tỉ lệ nợ ổn. Duy trì kỷ luật.'}</div>`;
-  }
+  renderAnalyze(s);
 }
 
 window.tapCheck=async function(id){
@@ -459,15 +467,16 @@ window.tapCheck=async function(id){
   const ppa=document.getElementById('prog-paid-amt');if(ppa) ppa.textContent=fmt(paidAmt);
   const pta=document.getElementById('prog-total-amt');if(pta) pta.textContent=fmt(totalPay);
   const pua=document.getElementById('ps-unpaid-amt');if(pua) pua.textContent=fmt(totalPay-paidAmt);
-  // Cập nhật wallet (chỉ trừ nợ đã tick)
-  const s=getState();
-  const monthTxns=s.txns[currentMonth]||[];
-  const txnIn=monthTxns.filter(t=>t.type==='in').reduce((sum,t)=>sum+Number(t.amount),0);
-  const txnOut=monthTxns.filter(t=>t.type==='out').reduce((sum,t)=>sum+Number(t.amount),0);
-  const totalIn=s.income.reduce((sum,x)=>sum+Number(x.amount),0)+txnIn;
-  const totalOut=s.expense.reduce((sum,x)=>sum+Number(x.amount),0)+txnOut;
-  const newWallet=totalIn-totalOut-paidAmt;
-  const kw=document.getElementById('kpi-wallet');if(kw&&!s.walletHidden) kw.textContent=fmt(newWallet);
+  // Cập nhật wallet (đồng bộ công thức: wallet = walletBase + income + txnIn - expense - txnOut)
+  const _s=getState();
+  const _mt=_s.txns[currentMonth]||[];
+  const _txnIn =_mt.filter(t=>t.type==='in') .reduce((sum,t)=>sum+Number(t.amount),0);
+  const _txnOut=_mt.filter(t=>t.type==='out').reduce((sum,t)=>sum+Number(t.amount),0);
+  const _totalIn =_s.income .reduce((sum,x)=>sum+Number(x.amount),0)+_txnIn;
+  const _totalOut=_s.expense.reduce((sum,x)=>sum+Number(x.amount),0)+_txnOut;
+  const _newWallet=walletBase+_totalIn-_totalOut;
+  const kw=document.getElementById('kpi-wallet');
+  if(kw&&!_s.walletHidden) kw.textContent=fmt(_newWallet);
 
   if(currentFilter==='unpaid') setTimeout(()=>{openDetail=null;renderCards(getState());},500);
   await saveToFirestore();
@@ -499,7 +508,7 @@ window.openTxnModal=function(){
   }
   setTxnType('out');
   document.getElementById('modal-txn').classList.add('open');
-  setTimeout(()=>document.getElementById('txn-amount').focus(),350);
+  requestAnimationFrame(()=>requestAnimationFrame(()=>document.getElementById('txn-amount')?.focus()));
 };
 function openTxnEdit(id){
   const t=(txns[currentMonth]||[]).find(x=>x.id===id);if(!t)return;
@@ -542,7 +551,8 @@ function renderChips(){
   });
 }
 window.saveTxn=async function(){
-  const name  =document.getElementById('txn-name').value.trim()||'Không tên';
+  const name=document.getElementById('txn-name').value.trim();
+  if(!name){showToast('⚠️ Nhập tên giao dịch');return;}
   const amount=getInputVal('txn-amount');
   if(!amount){showToast('⚠️ Nhập số tiền');return;}
   if(!txns[currentMonth]) txns[currentMonth]=[];
@@ -566,6 +576,26 @@ window.openTxnModalType=function(type){
   window.setTxnType(type);
 };
 window.showAllTxns=()=>{showAllTxnsFlag=true;renderTxnPage(getState());};
+window.filterTxnSearch=function(){
+  const q=(document.getElementById('txn-search')?.value||'').trim().toLowerCase();
+  const typeF=document.getElementById('txn-type-filter')?.value||'all';
+  const monthTxns=txns[currentMonth]||[];
+  const filtered=monthTxns.filter(t=>{
+    const matchQ=!q||t.name.toLowerCase().includes(q);
+    const matchT=typeF==='all'||t.type===typeF;
+    return matchQ&&matchT;
+  });
+  // Tái dùng renderTxnPage nhưng override danh sách
+  const list=document.getElementById('txn-list');if(!list)return;
+  list.innerHTML='';
+  if(!filtered.length){
+    list.innerHTML=`<div style="padding:20px;text-align:center;color:var(--sub);font-size:13px;font-weight:700">Không tìm thấy giao dịch nào</div>`;
+    return;
+  }
+  // Gọi renderTxnPage với state gốc nhưng txns đã lọc — tạo state tạm
+  const fakeTxns={...txns,[currentMonth]:filtered};
+  renderTxnPage({...getState(),txns:fakeTxns,showAllTxnsFlag:true});
+};
 
 // ── WALLET / SAVING ───────────────────────────────────────────
 window.saveWalletBase=async function(){
@@ -588,7 +618,7 @@ window.toggleWalletVis=function(){
   const totalExpense=expense.reduce((s,x)=>s+Number(x.amount),0);
   const txnIn=monthTxns.filter(t=>t.type==='in').reduce((s,t)=>s+Number(t.amount),0);
   const txnOut=monthTxns.filter(t=>t.type==='out').reduce((s,t)=>s+Number(t.amount),0);
-  const wallet=totalIncome+txnIn-totalExpense-txnOut;
+  const wallet=walletBase+totalIncome+txnIn-totalExpense-txnOut;
   el.textContent=walletHidden?'••••••':fmt(wallet);
   const eye=document.getElementById('wallet-eye');
   if(eye) eye.style.opacity=walletHidden?'0.4':'1';
@@ -597,19 +627,38 @@ window.openSavingModal=function(){
   document.getElementById('sv-name').value='';
   const sa=document.getElementById('sv-amount');sa.value='';sa.dataset.raw='';
   document.getElementById('modal-saving').classList.add('open');
-  setTimeout(()=>document.getElementById('sv-amount').focus(),350);
+  requestAnimationFrame(()=>requestAnimationFrame(()=>document.getElementById('sv-amount')?.focus()));
 };
 window.saveSaving=async function(){
   const name  =document.getElementById('sv-name').value.trim()||'Tiết kiệm';
   const amount=getInputVal('sv-amount');
   if(!amount){showToast('⚠️ Nhập số tiền');return;}
-  const date=new Date().toLocaleDateString('vi-VN',{day:'2-digit',month:'2-digit',year:'numeric'});
-  savings.push({id:'sv'+Date.now(),name,amount,date});
-  await saveToFirestore();window.closeModal('modal-saving');renderAll();showToast(`✓ +${fmt(amount)}`);
+  const dateVN=new Date().toLocaleDateString('vi-VN',{day:'2-digit',month:'2-digit',year:'numeric'});
+  const dateISO=new Date().toISOString().slice(0,10);
+  const svId='sv'+Date.now();
+  savings.push({id:svId, name, amount, date:dateVN});
+  // Tự động tạo txn Chi để trừ wallet — giữ dòng tiền nhất quán
+  if(!txns[currentMonth]) txns[currentMonth]=[];
+  txns[currentMonth].push({
+    id:'sv-txn-'+svId,
+    name:'💰 Góp quỹ: '+name,
+    amount,
+    type:'out',
+    date:dateISO,
+    isSaving:true // đánh dấu để phân biệt nếu cần
+  });
+  await saveToFirestore();
+  window.closeModal('modal-saving');
+  renderAll();
+  showToast(`✓ Đã góp ${fmt(amount)} vào quỹ tiết kiệm`);
 };
 window.deleteSaving=function(id){
   confirmAction('Xoá khoản tiết kiệm này?',async()=>{
     savings=savings.filter(x=>x.id!==id);
+    // Xoá txn Chi tương ứng nếu có
+    Object.keys(txns).forEach(m=>{
+      txns[m]=(txns[m]||[]).filter(t=>t.id!=='sv-txn-'+id);
+    });
     await saveToFirestore();renderAll();showToast('🗑 Đã xoá');
   });
 };
@@ -623,7 +672,7 @@ window.openLoanBookModal=function(id){
   document.getElementById('lb-note').value=item?.note||'';
   document.getElementById('lb-del').style.display=item?'block':'none';
   document.getElementById('modal-loanbook').classList.add('open');
-  setTimeout(()=>document.getElementById('lb-name').focus(),250);
+  requestAnimationFrame(()=>requestAnimationFrame(()=>document.getElementById('lb-name')?.focus()));
 };
 window.saveLoanBook=async function(){
   const name=document.getElementById('lb-name').value.trim();
@@ -645,6 +694,14 @@ window.deleteLoanBook=function(){
     loanBook=loanBook.filter(x=>x.id!==editLoanId);
     await saveToFirestore();window.closeModal('modal-loanbook');renderAll();showToast('🗑 Đã xoá');
   });
+};
+window.toggleLoanCollected=function(id){
+  const item=loanBook.find(x=>x.id===id);if(!item)return;
+  item.collected=!item.collected;
+  item.collectedDate=item.collected?new Date().toLocaleDateString('vi-VN'):'';
+  saveToFirestore();
+  renderAll();
+  showToast(item.collected?`✓ Đã thu: ${item.name}`:`↩ ${item.name} chưa thu`);
 };
 
 // ── DEBT TYPE SHEET ───────────────────────────────────────────

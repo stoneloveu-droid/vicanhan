@@ -1,3 +1,4 @@
+import { monthSummary, paymentAmount, escapeHTML } from './finance.js';
 // ── render.js ─────────────────────────────────────────────────
 // Tất cả hàm render UI: home, paid, cards, txn, settings,
 // tools, report, charts
@@ -21,7 +22,7 @@ function debtMeta(d){
     const kStr=d.totalTerm?`Kỳ ${d.curTerm||0}/${d.totalTerm} · `:'';
     return `${kStr}Ngày ${d.payDay||'—'}`;
   }
-  return `${d.note||''} · Ngày ${d.payDay||'—'}`;
+  return `${escapeHTML(d.note||'')} · Ngày ${d.payDay||'—'}`;
 }
 
 // Bank color/abbr maps
@@ -31,9 +32,9 @@ const BANK_ABBR={'tp':'TP','ocb':'OCB','vp-td':'VP','shin-td':'SH','vp-tc':'VP',
 
 export function addCard2(wrap,d,ms){
   const paid=!!ms[d.id], settled=!!d.settled;
-  const monthly=d.type==='tc'?tcGetMonthly(d):Number(d.monthly||0);
+  const monthly=paymentAmount(d,ms[d.id]);
   const bg=BANK_COLORS[d.id]||'#374151';
-  const abbr=BANK_ABBR[d.id]||(d.name.slice(0,2).toUpperCase());
+  const abbr=escapeHTML(BANK_ABBR[d.id]||(d.name.slice(0,2).toUpperCase()));
 
   let sub='';
   if(d.type==='tc'&&d.totalTerm){
@@ -57,9 +58,10 @@ export function addCard2(wrap,d,ms){
       else if(_daysLeft<=3) _dueLbl=`<span style="color:var(--orange);font-weight:900"> · ⏰ Còn ${_daysLeft} ngày</span>`;
       else                  _dueLbl=`<span style="color:var(--sub)"> · Ngày ${d.payDay}</span>`;
     }
-    sub=`${feeLbl}${_dueLbl}${d.note?` · ${d.note}`:''}`;
+    if(paid) _dueLbl='<span style="color:var(--teal)">Đã trả kỳ này</span>';
+    sub=`${feeLbl}${_dueLbl}${d.note?` · ${escapeHTML(d.note)}`:''}`;
   } else {
-    sub=`${d.note||''} · Ngày ${d.payDay||'—'}`;
+    sub=`${escapeHTML(d.note||'')} · Ngày ${d.payDay||'—'}`;
   }
 
   let usageBarHTML='';
@@ -104,14 +106,14 @@ export function addCard2(wrap,d,ms){
       </div>
       <div class="bank-ico" style="background:${bg}">${abbr}</div>
       <div class="d-info">
-        <div class="d-name">${d.name}${settled?'<span class="settled-tag">Tất toán</span>':''}</div>
+        <div class="d-name">${escapeHTML(d.name)}${settled?'<span class="settled-tag">Tất toán</span>':''}</div>
         <div class="d-sub">${sub}</div>
       </div>
       <div class="d-right">
         <div class="d-amt ${d.type}">${fmt(monthly)}</div>
         <div class="d-unit">/ tháng</div>
       </div>
-      <button class="chk${paid?' checked':''}" id="cb-${d.id}" ${settled?'disabled':''}
+      <button class="chk${paid?' checked':''}" id="cb-${d.id}" ${settled&&!paid?'disabled':''} aria-label="${paid?'Hoàn tác thanh toán':'Đánh dấu đã trả'}"
         onclick="event.stopPropagation();tapCheck('${d.id}')">✓</button>
     </div>
     <div class="dcard-detail" id="dd-${d.id}">
@@ -122,28 +124,19 @@ export function addCard2(wrap,d,ms){
 }
 
 // ── RENDER HOME ───────────────────────────────────────────────
-export function renderHome({debts, income, expense, ticks, txns, savings, walletBase, walletHidden, currentMonth}){
+export function renderHome(state){
+ const {debts,income,expense,ticks,txns,savings,walletBase,walletHidden,currentMonth}=state;
   const el=id=>document.getElementById(id);
   const n=new Date();
   if(el('sub-date')) el('sub-date').textContent=n.toLocaleDateString('vi-VN',{weekday:'long',day:'numeric',month:'numeric'});
   if(el('month-label')) el('month-label').textContent=getML(currentMonth);
 
-  const totalIncome =income.reduce((s,x)=>s+Number(x.amount),0);
-  const totalExpense=expense.reduce((s,x)=>s+Number(x.amount),0);
-  const totalDebtPay=debts.filter(d=>!d.settled).reduce((s,d)=>s+(d.type==='tc'?tcGetMonthly(d):Number(d.monthly||0)),0);
-  const monthTxns=txns[currentMonth]||[];
-  const txnIn =monthTxns.filter(t=>t.type==='in').reduce((s,t)=>s+Number(t.amount),0);
-  const txnOut=monthTxns.filter(t=>t.type==='out').reduce((s,t)=>s+Number(t.amount),0);
-  const totalIn =totalIncome+txnIn;
-  const totalOut=totalExpense+txnOut;
-  const remain  =totalIn-totalOut-totalDebtPay;
-  const totalDebtLeft=debts.filter(d=>!d.settled).reduce((s,d)=>s+(d.type==='tc'?tcGetDebt(d):Number(d.used||0)),0);
-  const ms=ticks[currentMonth]||{};
-  const paidDebtAmt=debts.filter(d=>!d.settled&&ms[d.id]).reduce((s,d)=>s+(d.type==='tc'?tcGetMonthly(d):Number(d.monthly||0)),0);
-  // Số dư ví = tiền đang thực sự có: thu - chi thường - các khoản nợ ĐÃ tick trả
-  // (nợ chưa tick = chưa chi ra, nên chưa trừ)
-  const wallet=totalIn-totalOut-paidDebtAmt;
-
+  const summary=monthSummary(state);
+ const {totalIn,totalOut,totalDebtPay,wallet,paidDebt:paidDebtAmt,debtLeft:totalDebtLeft,available:remain}=summary;
+ const ms=ticks[currentMonth]||{};
+ if(el('available-amount')) el('available-amount').textContent=walletHidden?'••••••':fmt(remain);
+ if(el('home-debt-left')) el('home-debt-left').textContent=fmt(totalDebtLeft);
+ if(el('home-unpaid')) el('home-unpaid').textContent=fmt(summary.unpaidDebt);
   if(el('kpi-income'))   el('kpi-income').textContent=fmt(totalIn);
   if(el('kpi-expense'))  el('kpi-expense').textContent=fmt(totalOut);
   if(el('kpi-debt-pay')) el('kpi-debt-pay').textContent=fmt(totalDebtPay);
@@ -159,7 +152,7 @@ export function renderHome({debts, income, expense, ticks, txns, savings, wallet
   if(el('kpi-debt-pay-mini')) el('kpi-debt-pay-mini').textContent=fmt(totalDebtPay);
 
 
-  const paidAmt=debts.filter(d=>!d.settled&&ms[d.id]).reduce((s,d)=>s+(d.type==='tc'?tcGetMonthly(d):Number(d.monthly||0)),0);
+  const paidAmt=summary.paidDebt;
   const pct=totalDebtPay?Math.round(paidAmt/totalDebtPay*100):0;
   const circumference=201;
   const offset=circumference-(circumference*pct/100);
@@ -188,17 +181,25 @@ export function renderHome({debts, income, expense, ticks, txns, savings, wallet
 }
 
 // ── RENDER PAID ───────────────────────────────────────────────
-export function renderPaid({debts, ticks, currentMonth, currentFilter}){
+export function renderPaid(state){
+ const {debts,ticks,currentMonth,currentFilter}=state;
+ const summary=monthSummary(state);
   const el=id=>document.getElementById(id);
   if(el('paid-month-label')) el('paid-month-label').textContent=getML(currentMonth);
 
   const ms=ticks[currentMonth]||{};
-  const activeDebts=debts.filter(d=>!d.settled);
-  const totalPay=activeDebts.reduce((s,d)=>s+(d.type==='tc'?tcGetMonthly(d):Number(d.monthly||0)),0);
-  const paidAmt =activeDebts.filter(d=>ms[d.id]).reduce((s,d)=>s+(d.type==='tc'?tcGetMonthly(d):Number(d.monthly||0)),0);
+  const activeDebts=debts.filter(d=>!d.settled||ms[d.id]);
+  const totalPay=summary.totalDebtPay;
+  const paidAmt=summary.paidDebt;
   const pct=totalPay?Math.round(paidAmt/totalPay*100):0;
 
-  if(el('ps-total-debt')) el('ps-total-debt').textContent=fmt(totalPay);
+  if(el('prog-pct')) el('prog-pct').textContent=pct+'%';
+ if(el('circ-fill')) el('circ-fill').style.strokeDashoffset=201*(1-pct/100);
+ if(el('prog-paid-amt')) el('prog-paid-amt').textContent=fmt(paidAmt);
+ if(el('prog-total-amt')) el('prog-total-amt').textContent=fmt(totalPay);
+ if(el('kpi-debt-total')) el('kpi-debt-total').textContent=fmt(summary.debtLeft);
+ if(el('debt-month-label')) el('debt-month-label').textContent=getML(currentMonth);
+ if(el('ps-total-debt')) el('ps-total-debt').textContent=fmt(totalPay);
   if(el('ps-paid'))       el('ps-paid').textContent=fmt(paidAmt);
   if(el('ps-unpaid-amt')) el('ps-unpaid-amt').textContent=fmt(totalPay-paidAmt);
   if(el('debt-prog-fill')) el('debt-prog-fill').style.width=pct+'%';
@@ -218,8 +219,8 @@ export function renderCards({debts, ticks, currentMonth, currentFilter}){
   if(!list) return;
   list.innerHTML='';
   const ms=ticks[currentMonth]||{};
-  const activeDebts=debts.filter(d=>!d.settled);
-  const settledDebts=debts.filter(d=>d.settled);
+  const activeDebts=debts.filter(d=>!d.settled||ms[d.id]);
+  const settledDebts=debts.filter(d=>d.settled&&!ms[d.id]);
   let show=activeDebts;
   if(currentFilter==='unpaid') show=activeDebts.filter(d=>!ms[d.id]);
   if(currentFilter==='paid2')  show=activeDebts.filter(d=>!!ms[d.id]);
@@ -256,16 +257,12 @@ export function renderCards({debts, ticks, currentMonth, currentFilter}){
 }
 
 // ── RENDER TXN PAGE ───────────────────────────────────────────
-export function renderTxnPage({debts, income, expense, txns, walletBase, currentMonth, showAllTxnsFlag}){
+export function renderTxnPage(state){
+ const {debts,income,expense,txns,walletBase,currentMonth,showAllTxnsFlag,filteredTxns}=state;
   const el=id=>document.getElementById(id);
   if(el('txn-month-label')) el('txn-month-label').textContent=getML(currentMonth);
   const monthTxns=txns[currentMonth]||[];
-  const txnIn =monthTxns.filter(t=>t.type==='in').reduce((s,t)=>s+Number(t.amount),0);
-  const txnOut=monthTxns.filter(t=>t.type==='out').reduce((s,t)=>s+Number(t.amount),0);
-  const baseRemain=income.reduce((s,x)=>s+Number(x.amount),0)
-    -expense.reduce((s,x)=>s+Number(x.amount),0)
-    -debts.filter(d=>!d.settled).reduce((s,d)=>s+(d.type==='tc'?tcGetMonthly(d):Number(d.monthly||0)),0);
-  const txnRemain=baseRemain+txnIn-txnOut;
+  const {txnIn,txnOut,available:txnRemain}=monthSummary(state);
   if(el('txn-kpi-in'))  el('txn-kpi-in').textContent=fmt(txnIn);
   if(el('txn-kpi-out')) el('txn-kpi-out').textContent=fmt(txnOut);
   if(el('txn-kpi-remain')){
@@ -275,7 +272,7 @@ export function renderTxnPage({debts, income, expense, txns, walletBase, current
   const list=el('txn-list');
   if(list){
     list.innerHTML='';
-    if(!monthTxns.length){
+    if(!(filteredTxns||monthTxns).length){
       list.innerHTML=`<div class="empty-card compact">
         <div class="empty-ico">📝</div>
         <div class="empty-title">Chưa có giao dịch tháng này</div>
@@ -283,7 +280,7 @@ export function renderTxnPage({debts, income, expense, txns, walletBase, current
         <button onclick="openTxnModal()">+ Ghi giao dịch</button>
       </div>`;
     } else {
-      const show=[...monthTxns].reverse().slice(0,showAllTxnsFlag?9999:8);
+      const show=[...(filteredTxns||monthTxns)].sort((a,b)=>(b.date||'').localeCompare(a.date||'')||b.id.localeCompare(a.id)).slice(0,showAllTxnsFlag?9999:8);
       show.forEach(t=>{
         const row=document.createElement('div');row.className='txn-row';
         row.onclick=()=>window._openTxnEdit&&window._openTxnEdit(t.id);
@@ -292,7 +289,7 @@ export function renderTxnPage({debts, income, expense, txns, walletBase, current
         row.innerHTML=`
           <div class="txn-cat-ico" style="background:${bg}">${ico}</div>
           <div class="txn-info">
-            <div class="txn-name">${t.name}</div>
+            <div class="txn-name">${escapeHTML(t.name)}</div>
             ${t.date?`<div style="font-size:10px;color:var(--sub);font-weight:600">${new Date(t.date).toLocaleDateString('vi-VN',{day:'numeric',month:'numeric'})}</div>`:''}
           </div>
           <div class="txn-amount ${t.type}">${t.type==='in'?'+':'-'}${fmt(t.amount)}</div>`;
@@ -327,16 +324,17 @@ function txnCatIcon(name,type){
 export function renderSavingList(savings){
   const el=document.getElementById('saving-hist');if(!el)return;
   el.innerHTML='';
-  if(!savings.length){el.innerHTML=`<div style="padding:14px;text-align:center;color:var(--sub);font-size:12px;font-weight:700">Chưa có</div>`;return;}
+  const st=document.getElementById('saving-total');if(st)st.textContent=fmt(savings.reduce((s,x)=>s+Number(x.amount),0));
+ if(!savings.length){el.innerHTML=`<div style="padding:14px;text-align:center;color:var(--sub);font-size:12px;font-weight:700">Chưa có</div>`;return;}
   [...savings].reverse().forEach(s=>{
     const row=document.createElement('div');row.className='save-row';
-    row.innerHTML=`<div class="save-row-left"><div class="save-row-name">${s.name}</div><div class="save-row-date">${s.date||''}</div></div>
+    row.innerHTML=`<div class="save-row-left"><div class="save-row-name">${escapeHTML(s.name)}</div><div class="save-row-date">${escapeHTML(s.date||'')}</div></div>
       <div style="display:flex;align-items:center;gap:8px"><div class="save-row-amt">+${fmt(s.amount)}</div>
       <button class="s-del" onclick="window.deleteSaving('${s.id}')">✕</button></div>`;
     el.appendChild(row);
   });
   const total=savings.reduce((s,x)=>s+Number(x.amount),0);
-  const st=document.getElementById('saving-total');if(st) st.textContent=fmt(total);
+  if(st)st.textContent=fmt(total);
 }
 
 // ── RENDER SETTINGS ───────────────────────────────────────────
@@ -371,8 +369,8 @@ function renderFinList(mode, items){
     const ico=mode==='income'?'💵':'🧾';const bg=mode==='income'?'rgba(200,255,87,.1)':'rgba(255,87,87,.1)';
     row.innerHTML=`<div class="s-ico" style="background:${bg}">${ico}</div>
       <div class="s-info" onclick="openFinEdit('${mode}','${it.id}')">
-        <div class="s-name">${it.name}</div>
-        <div class="s-val fin-val">${fmt(it.amount)} <span style="font-weight:600;color:var(--sub)">${it.note||''}</span></div>
+        <div class="s-name">${escapeHTML(it.name)}</div>
+        <div class="s-val fin-val">${fmt(it.amount)} <span style="font-weight:600;color:var(--sub)">${escapeHTML(it.note||'')}</span></div>
       </div><button class="s-del" onclick="confirmDelFin('${mode}','${it.id}')">✕</button>`;
     el.appendChild(row);
   });
@@ -393,7 +391,7 @@ function renderDebtList(type, debts){
       :`${fmt(monthly)}/th · Kỳ ${d.curTerm||0}/${d.totalTerm||0} · Dư: ${fmt(tcGetDebt(d))}`;
     row.innerHTML=`<div class="s-ico" style="background:${bg}">${ico}</div>
       <div class="s-info" onclick="openDebtEdit('${d.id}')">
-        <div class="s-name">${d.name}${d.settled?' 🎉':''}</div>
+        <div class="s-name">${escapeHTML(d.name)}${d.settled?' 🎉':''}</div>
         <div class="s-val">${subText}</div>
       </div><button class="s-del" onclick="confirmDelDebt('${d.id}')">✕</button>`;
     el.appendChild(row);
@@ -447,8 +445,8 @@ export function renderLoanBookList(items=[]){
       row.style=isCollected?'opacity:0.55':'';
       row.innerHTML=`
         <div class="save-row-left">
-          <div class="save-row-name" style="${isCollected?'text-decoration:line-through':''}">${it.name}</div>
-          <div class="save-row-date">${it.note||''} ${it.date?'· '+it.date:''} ${it.collectedDate?'· Thu: '+it.collectedDate:''}</div>
+          <div class="save-row-name" style="${isCollected?'text-decoration:line-through':''}">${escapeHTML(it.name)}</div>
+          <div class="save-row-date">${escapeHTML(it.note||'')} ${it.date?'· '+escapeHTML(it.date):''} ${it.collectedDate?'· Thu: '+escapeHTML(it.collectedDate):''}</div>
         </div>
         <div style="display:flex;align-items:center;gap:6px">
           <div class="save-row-amt" style="color:${isCollected?'var(--sub)':'var(--orange)'}">${fmt(it.amount)}</div>
@@ -476,7 +474,7 @@ function renderSchedule(debts){
     const isToday=d.payDay===today,isOverdue=d.payDay<today;
     const monthly=d.type==='tc'?tcGetMonthly(d):Number(d.monthly||0);
     row.innerHTML=`<div class="sched-day${isToday?' today':isOverdue?' overdue':''}">${d.payDay}</div>
-      <div><div class="sched-name">${d.name}</div>
+      <div><div class="sched-name">${escapeHTML(d.name)}</div>
       <div style="font-size:10px;font-weight:600;color:var(--sub)">${isToday?'🔴 Hôm nay':isOverdue?'Đã qua':'Sắp tới'}</div></div>
       <div class="sched-amt">${fmt(monthly)}</div>`;
     el.appendChild(row);
@@ -509,7 +507,7 @@ export function renderAnalyze({debts, income, expense}){
   let payoffItems='';
   debts.filter(d=>!d.settled&&d.type==='tc'&&d.totalTerm).sort((a,b)=>(a.totalTerm-(a.curTerm||0))-(b.totalTerm-(b.curTerm||0))).slice(0,3).forEach(d=>{
     const rem=d.totalTerm-(d.curTerm||0);const nd=new Date();nd.setMonth(nd.getMonth()+rem);
-    payoffItems+=`<div class="analyze-item"><span class="analyze-key">${d.name}</span><span class="analyze-val" style="font-size:12px">${nd.toLocaleDateString('vi-VN',{month:'numeric',year:'numeric'})} (còn ${rem} kỳ)</span></div>`;
+    payoffItems+=`<div class="analyze-item"><span class="analyze-key">${escapeHTML(d.name)}</span><span class="analyze-val" style="font-size:12px">${nd.toLocaleDateString('vi-VN',{month:'numeric',year:'numeric'})} (còn ${rem} kỳ)</span></div>`;
   });
   el.innerHTML=`<div class="analyze-score"><div class="analyze-score-num" style="color:${scoreColor}">${score}</div>
     <div class="analyze-score-label">Điểm sức khoẻ tài chính · ${scoreLabel}</div></div>
@@ -524,22 +522,15 @@ export function renderAnalyze({debts, income, expense}){
 // ── RENDER REPORT ─────────────────────────────────────────────
 let donutChart=null;
 
-export function renderReport({debts, income, expense, txns, savings, currentMonth}){
+export function renderReport(state){
+ const {debts,income,expense,txns,savings,currentMonth}=state;
   const el=id=>document.getElementById(id);
   if(el('report-month-label')) el('report-month-label').textContent=getML(currentMonth);
   const m=parseInt(currentMonth.split('-')[1]);
   if(el('rpt-title')) el('rpt-title').textContent=`Tổng quan tháng ${m}`;
 
-  const totalIncome =income.reduce((s,x)=>s+Number(x.amount),0);
-  const monthTxns   =txns[currentMonth]||[];
-  const txnIn       =monthTxns.filter(t=>t.type==='in').reduce((s,t)=>s+Number(t.amount),0);
-  const txnOut      =monthTxns.filter(t=>t.type==='out').reduce((s,t)=>s+Number(t.amount),0);
-  const totalIn     =totalIncome+txnIn;
-  const fixedExpense=expense.reduce((s,x)=>s+Number(x.amount),0);
-  const totalExpense=fixedExpense+txnOut;
-  const totalDebtPay=debts.filter(d=>!d.settled).reduce((s,d)=>s+(d.type==='tc'?tcGetMonthly(d):Number(d.monthly||0)),0);
-  const conDu       =totalIn-totalExpense-totalDebtPay;
-
+  const {totalIn,fixedExpense,totalOut:totalExpense,txnOut,totalDebtPay,available:conDu}=monthSummary(state);
+ const monthTxns=txns[currentMonth]||[];
   if(el('rpt-income'))  el('rpt-income').textContent=fmt(totalIn);
   if(el('rpt-expense')) el('rpt-expense').textContent=fmt(totalExpense);
   if(el('rpt-expense-fixed')) el('rpt-expense-fixed').textContent=fmt(fixedExpense);
@@ -579,23 +570,17 @@ function renderDonutChart(fixedExpense, monthTxns){
     cats['Chi cố định'].amount+=fixedExpense;
   }
   const data=Object.values(cats).filter(c=>c.amount>0);
-  const total=data.reduce((s,c)=>s+c.amount,0)||1;
+  const total=data.reduce((s,c)=>s+c.amount,0);
   if(el('donut-total')) el('donut-total').textContent=fmt(total);
 
   const canvas=el('donut-chart');
   if(!canvas) return;
-  if(donutChart) donutChart.destroy();
-  donutChart=new Chart(canvas,{
-    type:'doughnut',
-    data:{labels:data.map(c=>c.label),datasets:[{data:data.map(c=>c.amount),backgroundColor:data.map(c=>c.color),borderWidth:2,borderColor:'var(--surface)'}]},
-    options:{cutout:'70%',plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${ctx.label}: ${fmt(ctx.raw)}`}}},animation:{animateRotate:true,duration:600}}
-  });
-
   const legend=el('donut-legend');
   if(legend){
     legend.innerHTML='';
-    data.forEach(c=>{
-      const pct=Math.round(c.amount/total*100);
+    if(!data.length) legend.textContent='Chưa có chi tiêu trong tháng này.';
+ data.forEach(c=>{
+      const pct=Math.round(c.amount/(total||1)*100);
       const row=document.createElement('div');row.className='dl-row';
       row.innerHTML=`<div class="dl-dot" style="background:${c.color}"></div>
         <span class="dl-name">${c.label}</span>
@@ -604,4 +589,9 @@ function renderDonutChart(fixedExpense, monthTxns){
       legend.appendChild(row);
     });
   }
+  if(typeof Chart==='undefined') return;
+ const chartData={labels:data.length?data.map(c=>c.label):['Chưa có chi tiêu'],datasets:[{data:data.length?data.map(c=>c.amount):[1],backgroundColor:data.length?data.map(c=>c.color):['#29273b'],borderWidth:0,hoverOffset:5,borderRadius:5,spacing:3}]};
+ if(donutChart){donutChart.data=chartData;donutChart.update();return;}
+ donutChart=new Chart(canvas,{type:'doughnut',data:chartData,options:{cutout:'78%',plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.label+': '+fmt(ctx.label==='Chưa có chi tiêu'?0:ctx.raw)}}},animation:{duration:matchMedia('(prefers-reduced-motion: reduce)').matches?0:650}}});
+
 }

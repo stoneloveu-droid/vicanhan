@@ -1,7 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getAuth, GoogleAuthProvider, signInWithPopup, signInAnonymously, onAuthStateChanged, signOut }
+import { getAuth, GoogleAuthProvider, signInWithPopup, linkWithPopup, signInAnonymously, onAuthStateChanged, signOut }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, doc, onSnapshot, setDoc }
+import { getFirestore, doc, onSnapshot, runTransaction, getDoc }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 // ⚠️  BẢO MẬT: Sau khi deploy, vào Firebase Console:
@@ -26,4 +26,4 @@ const fbApp = initializeApp(firebaseConfig);
 const auth  = getAuth(fbApp);
 const db    = getFirestore(fbApp);
 
-export { auth, db, doc, onSnapshot, setDoc, GoogleAuthProvider, signInWithPopup, signInAnonymously, onAuthStateChanged, signOut };
+export { auth, db, doc, onSnapshot, runTransaction, getDoc, GoogleAuthProvider, signInWithPopup, linkWithPopup, signInAnonymously, onAuthStateChanged, signOut };

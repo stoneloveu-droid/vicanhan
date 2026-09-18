@@ -1,3 +1,4 @@
+import { escapeHTML } from './finance.js';
 // ── ui-utils.js ──────────────────────────────────────────────
 // DOM helpers, format inputs, toast, confirmAction, modals,
 // theme/accent, month picker, sync badge
@@ -29,11 +30,12 @@ export function setInputFmt(id,val){
 window.fmtInput = fmtInput;
 
 // ── TOAST ─────────────────────────────────────────────────────
+let toastTimer;
 export function showToast(msg){
   const t=document.getElementById('toast');
   t.textContent=msg;
   t.classList.add('show');
-  setTimeout(()=>t.classList.remove('show'),2200);
+  clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),4200);
 }
 
 // ── CONFIRM ACTION ────────────────────────────────────────────
@@ -41,7 +43,7 @@ export function confirmAction(msg, onOk){
   const overlay=document.createElement('div');
   overlay.style='position:fixed;inset:0;background:rgba(0,0,0,.72);backdrop-filter:blur(14px);z-index:500;display:flex;align-items:flex-end;justify-content:center';
   overlay.innerHTML=`<div style="background:var(--card2);border:1px solid var(--border);border-radius:28px 28px 0 0;width:100%;max-width:430px;padding:24px 20px calc(env(safe-area-inset-bottom,0px)+24px)">
-    <div style="font-size:15px;font-weight:800;text-align:center;margin-bottom:18px">${msg}</div>
+    <div style="font-size:15px;font-weight:800;text-align:center;margin-bottom:18px">${escapeHTML(msg)}</div>
     <div style="display:flex;gap:10px">
       <button id="ca-cancel" style="flex:1;padding:14px;border:1px solid var(--border);border-radius:14px;background:var(--card);color:var(--sub);font-family:'Mulish',sans-serif;font-size:14px;font-weight:800;cursor:pointer">Huỷ</button>
       <button id="ca-ok" style="flex:2;padding:14px;border:none;border-radius:14px;background:var(--red);color:#fff;font-family:'Mulish',sans-serif;font-size:14px;font-weight:800;cursor:pointer">Xác nhận</button>
@@ -49,7 +51,7 @@ export function confirmAction(msg, onOk){
   </div>`;
   document.body.appendChild(overlay);
   overlay.querySelector('#ca-cancel').onclick=()=>overlay.remove();
-  overlay.querySelector('#ca-ok').onclick=()=>{overlay.remove();onOk();};
+  overlay.querySelector('#ca-ok').onclick=async()=>{overlay.remove();try{await onOk();}catch(e){console.error(e);showToast(e.message||'Chưa lưu được. Vui lòng thử lại.');}};
 }
 
 // ── MODAL ─────────────────────────────────────────────────────
@@ -62,7 +64,8 @@ export function setSyncBadge(cls,txt){
   const dot=(badge&&badge.querySelector('.sync-dot'))||document.querySelector('.sync-badge .sync-dot')||document.getElementById('sync-dot');
   if(!dot) return;
   dot.className='sync-dot'+' '+cls;
-  if(badge) badge.title=txt;
+  if(badge){badge.title=txt;badge.setAttribute('aria-label',txt);}
+  const status=document.getElementById('sync-status-text');if(status)status.textContent=txt;
 }
 
 // ── THEME ─────────────────────────────────────────────────────
@@ -106,7 +109,7 @@ window.setAccent=function(name){
   window.closeModal('modal-theme');
 };
 export function initAccent(){
-  const saved=localStorage.getItem('vn_accent')||'lime';
+  const saved=localStorage.getItem('vn_accent')||'purple';
   window.setAccent(saved);
 }
 

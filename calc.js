@@ -26,41 +26,11 @@ export function getML(k){
  * Trả về { total, principal, interest, balance }
  */
 export function tcPaymentAtTerm(principal, rateYearly, totalTerm, method, term){
-  const r = rateYearly / 100 / 12;
-  const P = Number(principal)||0;
-  const n = Number(totalTerm)||1;
-  const t = Number(term)||1;
-
-  if(method==='fixed_principal'){
-    const principalPerTerm = P / n;
-    const balance0 = P - principalPerTerm * (t - 1);   // dư nợ đầu kỳ t
-    const interest  = Math.round(balance0 * r);
-    const princ     = Math.round(principalPerTerm);
-    return {
-      total:     princ + interest,
-      principal: princ,
-      interest,
-      balance:   Math.max(0, Math.round(balance0 - princ)),
-    };
-  } else {
-    // Dư nợ giảm dần — PMT cố định
-    if(!r) {
-      const princ = Math.round(P / n);
-      const balance = Math.max(0, P - princ * t);
-      return { total: princ, principal: princ, interest: 0, balance };
-    }
-    const pmt     = P * r * Math.pow(1+r, n) / (Math.pow(1+r, n) - 1);
-    const balance0= P * Math.pow(1+r, t-1) - pmt * (Math.pow(1+r, t-1) - 1) / r;
-    const interest = Math.round(balance0 * r);
-    const princ    = Math.round(pmt) - interest;
-    const balance  = Math.max(0, Math.round(balance0 - princ));
-    return {
-      total:     Math.round(pmt),
-      principal: princ,
-      interest,
-      balance,
-    };
-  }
+  const P=Number(principal),n=Number(totalTerm),t=Number(term),rate=Number(rateYearly);
+ if(!Number.isFinite(P)||P<=0||!Number.isInteger(n)||n<1||!Number.isInteger(t)||t<1||t>n||!Number.isFinite(rate)||rate<0)return {total:0,principal:0,interest:0,balance:0};
+ const before=tcBalance(P,rate,n,method,t-1),balance=tcBalance(P,rate,n,method,t);
+ const princ=before-balance,interest=Math.round(before*rate/1200);
+ return {total:princ+interest,principal:princ,interest,balance};
 }
 
 /**
@@ -137,9 +107,9 @@ export function tcGetDebt(d){
 
 // ── MIGRATE: rate %/tháng → %/năm ─────────────────────────────
 // Dữ liệu cũ lưu rate là %/tháng (VD: 1.5).
-// Nếu rate <= 5 thì có thể là %/tháng, nhân 12 để ra %/năm.
+// Chỉ chuyển khi dữ liệu khai báo rõ rateUnit là monthly.
 export function migrateRate(d){
-  if(d.type==='tc' && d.rate && d.rate <= 5 && !d.rateConverted){
+  if(d.type==='tc' && d.rate && d.rateUnit === 'monthly' && !d.rateConverted){
     d.rate = Math.round(d.rate * 12 * 100) / 100; // VD: 1.5 → 18
     d.rateConverted = true;
   }

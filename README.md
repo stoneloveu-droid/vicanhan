@@ -1,31 +1,36 @@
-# Ví của tôi — Aurora
+# Ví của tôi — Sổ tài chính cá nhân
 
-Ứng dụng tài chính cá nhân ưu tiên điện thoại. Giữ 5 tab: Tổng quan, Nợ, Thu chi, Công cụ, Cài đặt.
+Giao diện Aurora với 5 tab: Tổng quan, Nợ, Thu chi, Công cụ, Cài đặt.
 
 ## Chạy thử
 - `npm run preview:demo`: http://127.0.0.1:4173 — dữ liệu mẫu trong bộ nhớ, không gọi Firebase.
 - `npm run preview`: giao diện dùng Firebase hiện tại.
-- `npm test`: kiểm tra tính tiền, lịch trả nợ, hợp nhất dữ liệu và xử lý nội dung.
-- `node tests/smoke.cjs`: kiểm thử trình duyệt; cần bản demo đang chạy, Playwright và Microsoft Edge. Đường dẫn Playwright dùng runtime trên máy phát triển này.
+- `npm test`: kiểm thử logic.
+- `node tests/smoke.cjs`: cần bản demo đang chạy, Playwright và Microsoft Edge. Có thể đặt `PLAYWRIGHT_MODULE_PATH`.
 
-## Giao diện
-Aurora dùng nền tối, gradient, điều hướng nổi, phản hồi chạm, chuyển cảnh và bảng nhập có thể kéo xuống để đóng. Vuốt ngang vùng trống chuyển tab. Giữ tùy chọn sáng/tối và màu chủ đạo. Chuyển động tôn trọng thiết lập giảm chuyển động của hệ điều hành và có công tắc riêng.
+## Số dư và ngân sách
+- **Tiền hiện có:** tổng số dư từng ví/tài khoản. Mỗi tài khoản lấy lần cập nhật số dư gần nhất, cộng khoản thu, trừ khoản chi và tính chuyển tiền sau lần cập nhật đó.
+- **Cần giữ lại:** dự chi chưa thanh toán cộng nợ còn phải trả trong tháng.
+- **Có thể chi thêm:** tiền hiện có trừ số cần giữ lại. Số âm biểu thị thiếu ngân sách. Thu nhập chưa nhận không được tính là tiền có thể tiêu.
+- **Giao dịch:** bắt buộc chọn tài khoản và ngày đã phát sinh. Chuyển tiền có tài khoản gửi/nhận, không cộng vào thu–chi.
+- **Kế hoạch tháng:** nút Nhận tiền / Thanh toán tạo giao dịch liên kết. Cho phép thanh toán từng phần; phần còn lại tiếp tục được giữ trong ngân sách. Khoản phát sinh không làm giảm dự chi khác. Khi ghi giao dịch thủ công, chọn kế hoạch tương ứng để tránh giữ ngân sách hai lần.
+- **Nợ:** xác nhận thanh toán yêu cầu tài khoản, tạo khoản chi và cập nhật kỳ vay trong cùng lần lưu. Hoàn tác hoặc xóa giao dịch trả nợ phục hồi cả tiền và kỳ vay. Chỉ xác nhận kỳ đầy đủ theo số tiền của khoản nợ; không tự tăng kỳ khi đổi tháng.
+- **Tiết kiệm:** ghi chú riêng, không tác động số dư hoặc tạo khoản chi.
+- **Cập nhật số dư:** bấm tài khoản để nhập số dư thực tế khi cần đối chiếu. Giữ lịch sử cập nhật. Các giao dịch đã ghi đến ngày cập nhật nằm trong số dư đó; giao dịch mới cùng ngày vẫn tiếp tục được cộng/trừ. Sửa lần cập nhật cũ trong Lịch sử để sửa sai số liệu.
+- **Tháng trước:** số dư tính đến cuối tháng đã chọn từ lịch sử. Tháng tương lai dùng số dư hiện tại với kế hoạch tháng đó. Các ngày thu chi ở tương lai không được ghi nhận là đã phát sinh.
+- Số dư phụ thuộc giao dịch và lần đối chiếu người dùng nhập; ứng dụng không kết nối tài khoản ngân hàng.
 
-## Quy ước số liệu
-- Số dư theo kế hoạch = số dư đầu kỳ + thu cố định + giao dịch thu − chi cố định − giao dịch chi − nợ đã thanh toán.
-- Có thể chi tiêu = số dư theo kế hoạch − phần nợ chưa thanh toán.
-- Thu/chi cố định là kế hoạch tháng, không phải giao dịch ngân hàng được xác minh.
-- Các tháng dùng chung số dư nền và cấu hình thu/chi cố định hiện tại. Chưa phải sổ cái có kết chuyển hoặc lưu cấu hình lịch sử từng tháng.
-- Xác nhận thanh toán ở tháng hiện tại tăng kỳ vay và ghi lại số tiền kỳ đó; hoàn tác khôi phục kỳ trước. Chuyển tháng không tự tăng kỳ.
-- Tick cũ dạng boolean vẫn đọc được; không đoán lại các khoản tiền lịch sử chưa từng được lưu.
-- Lãi suất nhập theo %/năm. Không tự nhân 12 chỉ vì mức lãi thấp.
-- Tất toán sớm hiện là đánh dấu trạng thái; người dùng ghi khoản chi thực tế riêng.
-- Khoản góp quỹ có giao dịch chi liên kết; chỉnh/xóa từ Công cụ để tránh lệch số liệu.
+## Dữ liệu cũ
+- Giữ dữ liệu tại `users/{uid}`, mở rộng bản ghi hiện có; không xóa giao dịch cũ.
+- Giao dịch cũ chưa chọn tài khoản vẫn có trong thống kê thu–chi. Tổng quan thông báo cần bổ sung tài khoản; không tự đoán nguồn tiền.
+- Các lần cập nhật số dư dùng `accountId` ổn định và danh sách giao dịch đã nằm trong số dư. Tên + loại được dùng để nhận diện các tài khoản từ bản cũ.
+- `walletBase` cũ hiển thị thành “Số dư ban đầu”, không gán ngày giả.
+- Khoản tiết kiệm tự tạo trước đây (`sv-txn-`, `isSaving: true`) vẫn được lưu nhưng không tính chi; có thể đổi phân loại khi chỉnh sửa.
+- Tick nợ cũ vẫn được đọc, không tự tạo thêm giao dịch để tránh trừ trùng.
+- Kế hoạch mặc định cũ áp dụng cho tháng chưa lập kế hoạch; thay đổi kế hoạch chỉ thuộc tháng đang chọn.
+- JSON xuất đầy đủ dữ liệu. CSV có thông tin tài khoản và liên kết kế hoạch/nợ.
 
-## Lưu dữ liệu
-Giữ cấu trúc tài liệu `users/{uid}` và các trường cũ. Mỗi thao tác ghi dùng Firestore transaction và hợp nhất thay đổi theo bản ghi. Nếu hai thiết bị sửa xung đột, hủy lần ghi và thông báo tải lại; không âm thầm ghi đè. Lỗi lưu giữ biểu mẫu mở, phục hồi state và không báo thành công. Cần mạng để xác nhận lưu.
+## Lưu dữ liệu và kiểm tra
+Firestore transaction hợp nhất thay đổi độc lập; xung đột báo lỗi thay vì ghi đè. Lưu thất bại phục hồi dữ liệu và giữ biểu mẫu mở. Cần mạng để xác nhận lưu.
 
-Đăng nhập Google từ ví khách dùng liên kết tài khoản giữ UID. Nếu Google đã thuộc tài khoản khác, ứng dụng giữ ví khách và hướng dẫn xuất dữ liệu trước khi chuyển.
-
-## Phạm vi kiểm tra
-Kiểm thử chạy bằng Firebase giả lập trong bộ nhớ, không sử dụng tài khoản hay dữ liệu thật. Cần kiểm tra đăng nhập Google và Firestore Rules trên môi trường triển khai thực tế. Chưa triển khai lên hosting hoặc store. `lich-doi.html` là trang riêng, không thay đổi trong đợt này.
+Kiểm thử dùng Firebase giả lập, không chạm dữ liệu thật: số dư qua nhiều tháng, dự chi từng phần, chuyển tiền, cập nhật số dư cùng ngày, thêm/sửa/xóa giao dịch, thanh toán/hoàn tác nợ, tiết kiệm, thiếu ngân sách và giao diện 320–430px. Đăng nhập Google và Firestore Rules cần kiểm chứng trên môi trường thật. Trang riêng `lich-doi.html` không thuộc thay đổi.

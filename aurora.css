@@ -141,3 +141,26 @@ html[data-motion=off] *,html[data-motion=off] *:before,html[data-motion=off] *:a
 .seg2-btn{background:transparent;border:0;font-family:inherit}.page>.scroll{touch-action:pan-y pinch-zoom}
 
 .tog:focus-within{outline:2px solid var(--accent);outline-offset:4px;border-radius:20px}
+
+/* Notebook sections keep snapshots separate from transaction totals. */
+.balance-section{margin:10px 16px 0}
+.balance-section .sec-hdr{padding:14px 4px 9px}
+.note-link{border:0;background:transparent;color:var(--accent);font:600 11px Inter;min-height:40px}
+.balance-note-row{width:100%;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:18px;padding:14px;text-align:left;display:flex;align-items:center;justify-content:space-between;gap:12px;margin:8px 0;cursor:pointer}
+.balance-note-row>span{min-width:0}.balance-note-row b{display:block;font-size:12px;overflow-wrap:anywhere}
+.balance-note-row small{display:block;font-size:10px;color:var(--sub);margin-top:5px;line-height:1.6;overflow-wrap:anywhere}
+.balance-note-row strong{font-size:14px;white-space:nowrap;color:var(--blue)}
+.notebook-hint{font-size:11px;line-height:1.7;color:var(--sub);margin:10px 4px}
+.notebook-add{width:100%;margin:8px 0;font:600 12px Inter;cursor:pointer}
+.saving-notes-card{background:linear-gradient(115deg,#2b223a,#201f31);border-color:#c99bff25}
+.saving-notes-card strong,.saving-notes-card .eyebrow{color:var(--purple)}
+[hidden]{display:none!important}
+#legacy-saving-hint{margin:6px 20px 12px}
+#txn-legacy-option input{accent-color:var(--accent);width:18px;height:18px;vertical-align:middle;margin-right:5px}
+#balance-history{max-height:48dvh;overflow:auto}
+#page-home .report-overview .ro-row span:not(.ro-val){font-size:11px}
+[data-theme=light] .saving-notes-card{background:#ede4fa}
+
+.legacy-entry{display:block;font-size:9px;color:var(--orange);margin-top:4px;line-height:1.5}
+
+.wallet-breakdown{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:18px 0}.wallet-breakdown span{display:block;font-size:12px;opacity:.7;margin-bottom:5px}.wallet-breakdown strong{font-size:18px}.type-toggle .tt-btn{flex:1;font-size:12px}.fg[hidden]{display:none!important}#modal-txn .msheet{max-height:90dvh;overflow-y:auto}.note-link:disabled{opacity:.5}#unassigned-notice{margin:12px 20px}

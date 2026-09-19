@@ -1,4 +1,5 @@
-import { monthSummary, paymentAmount, escapeHTML } from './finance.js';
+import { renderBalanceBook } from './notebook-ui.js';
+import { planRemaining, monthSummary, paymentAmount, escapeHTML, balanceEntries, recordedEntries, isLegacySavingEntry, localDate } from './finance.js';
 // ── render.js ─────────────────────────────────────────────────
 // Tất cả hàm render UI: home, paid, cards, txn, settings,
 // tools, report, charts
@@ -124,62 +125,31 @@ export function addCard2(wrap,d,ms){
 }
 
 // ── RENDER HOME ───────────────────────────────────────────────
+
 export function renderHome(state){
- const {debts,income,expense,ticks,txns,savings,walletBase,walletHidden,currentMonth}=state;
-  const el=id=>document.getElementById(id);
-  const n=new Date();
-  if(el('sub-date')) el('sub-date').textContent=n.toLocaleDateString('vi-VN',{weekday:'long',day:'numeric',month:'numeric'});
-  if(el('month-label')) el('month-label').textContent=getML(currentMonth);
-
-  const summary=monthSummary(state);
- const {totalIn,totalOut,totalDebtPay,wallet,paidDebt:paidDebtAmt,debtLeft:totalDebtLeft,available:remain}=summary;
- const ms=ticks[currentMonth]||{};
- if(el('available-amount')) el('available-amount').textContent=walletHidden?'••••••':fmt(remain);
- if(el('home-debt-left')) el('home-debt-left').textContent=fmt(totalDebtLeft);
- if(el('home-unpaid')) el('home-unpaid').textContent=fmt(summary.unpaidDebt);
-  if(el('kpi-income'))   el('kpi-income').textContent=fmt(totalIn);
-  if(el('kpi-expense'))  el('kpi-expense').textContent=fmt(totalOut);
-  if(el('kpi-debt-pay')) el('kpi-debt-pay').textContent=fmt(totalDebtPay);
-  if(el('kpi-remain')){
-    el('kpi-remain').textContent=remain>=0?fmt(remain):'-'+fmt(Math.abs(remain));
-    el('kpi-remain').style.color=remain>=0?'var(--purple)':'var(--red)';
-  }
-  if(el('kpi-debt-total')) el('kpi-debt-total').textContent=fmt(totalDebtLeft);
-  if(el('kpi-wallet')) el('kpi-wallet').textContent=walletHidden?'••••••':fmt(wallet);
-  // Mini KPI dưới wallet card
-  if(el('kpi-income-mini'))  el('kpi-income-mini').textContent=fmt(totalIn);
-  if(el('kpi-expense-mini')) el('kpi-expense-mini').textContent=fmt(totalOut);
-  if(el('kpi-debt-pay-mini')) el('kpi-debt-pay-mini').textContent=fmt(totalDebtPay);
-
-
-  const paidAmt=summary.paidDebt;
-  const pct=totalDebtPay?Math.round(paidAmt/totalDebtPay*100):0;
-  const circumference=201;
-  const offset=circumference-(circumference*pct/100);
-  if(el('circ-fill')) el('circ-fill').style.strokeDashoffset=offset;
-  if(el('prog-pct'))  el('prog-pct').textContent=pct+'%';
-  if(el('prog-paid-amt'))  el('prog-paid-amt').textContent=fmt(paidAmt);
-  if(el('prog-total-amt')) el('prog-total-amt').textContent=fmt(totalDebtPay);
-
-  const today=new Date().getDate();
-  const upcoming=debts.filter(d=>!d.settled&&d.payDay&&(d.payDay>=today&&d.payDay<=today+7));
-  if(el('upcoming-badge')) el('upcoming-badge').textContent=upcoming.length;
-  if(el('upcoming-sub')){
-    if(upcoming.length){
-      const names=upcoming.map(d=>d.name).join(', ');
-      el('upcoming-sub').textContent=`${upcoming.length} khoản nợ trong 7 ngày tới`;
-    } else {
-      el('upcoming-sub').textContent='Không có khoản nào sắp đến hạn';
-    }
-  }
-  if(el('upcoming-card')){el('upcoming-card').style.visibility=upcoming.length?'visible':'hidden';el('upcoming-card').style.opacity=upcoming.length?'1':'0';}
-  // Banner cảnh báo tháng cũ
-  const _realMonth=(()=>{const n=new Date();return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}`;})();
-  const _isPast = currentMonth !== _realMonth;
-  const _bannerHome = document.getElementById('past-month-banner-home');
-  if(_bannerHome) _bannerHome.style.display = _isPast ? 'block' : 'none';
+  const {currentMonth,walletHidden}=state,summary=monthSummary(state);
+  const set=(id,value)=>{const el=document.getElementById(id);if(el)el.textContent=value;};
+  set('sub-date',new Date().toLocaleDateString('vi-VN',{weekday:'long',day:'numeric',month:'numeric'}));
+  set('month-label',getML(currentMonth));
+  const hasNotes=balanceEntries(state.balanceNotes,state.walletBase).length>0;
+  set('kpi-wallet',walletHidden?'••••••':summary.accounts.length?fmt(summary.available):'Chưa có số dư');
+  set('available-amount',fmt(summary.remainingExpense));
+  set('hero-balance',walletHidden?'••••••':fmt(summary.balanceTotal));
+  set('hero-reserved',walletHidden?'••••••':fmt(summary.reserved));
+  set('wallet-status',!summary.accounts.length?'Thêm số dư để bắt đầu theo dõi.':summary.available<0?'Thiếu tiền cho các khoản cần thanh toán.':summary.available===0?'Đã hết ngân sách có thể chi.':'Sau các khoản cần thanh toán trong tháng.');
+  document.getElementById('kpi-wallet').style.color=summary.available<0?'var(--red)':'';
+  const notice=document.getElementById('unassigned-notice');
+  if(notice){notice.hidden=!summary.unassigned;notice.textContent=summary.unassigned+' giao dịch chưa chọn tài khoản. Mở Thu chi để bổ sung và cập nhật số dư chính xác.';}
+  set('home-saving-notes',walletHidden?'••••••':fmt(summary.savingTotal));
+  set('home-debt-left',fmt(summary.debtLeft));set('home-unpaid',fmt(summary.unpaidDebt));
+  set('kpi-income-mini',fmt(summary.totalIn));set('kpi-expense-mini',fmt(summary.totalOut));
+  set('kpi-debt-pay-mini',fmt(summary.totalDebtPay));
+  set('kpi-income',fmt(summary.totalIn));set('kpi-expense',fmt(summary.totalOut));
+  set('kpi-debt-pay',fmt(summary.totalDebtPay));set('kpi-remain',fmt(summary.net));
+  renderBalanceBook(state.balanceNotes,state.walletBase,walletHidden,state.txns,undefined,summary.accounts);
+  const banner=document.getElementById('past-month-banner-home');
+  if(banner)banner.style.display=currentMonth!==localDate().slice(0,7)?'block':'none';
 }
-
 // ── RENDER PAID ───────────────────────────────────────────────
 export function renderPaid(state){
  const {debts,ticks,currentMonth,currentFilter}=state;
@@ -262,7 +232,10 @@ export function renderTxnPage(state){
   const el=id=>document.getElementById(id);
   if(el('txn-month-label')) el('txn-month-label').textContent=getML(currentMonth);
   const monthTxns=txns[currentMonth]||[];
-  const {txnIn,txnOut,available:txnRemain}=monthSummary(state);
+  const legacyCount=monthTxns.filter(isLegacySavingEntry).length;
+  const hint=document.getElementById('legacy-saving-hint');if(hint){hint.hidden=!legacyCount;hint.textContent=legacyCount+' khoản được phân loại là tiết kiệm. Chọn giao dịch để thay đổi phân loại.';}
+  const {txnIn,txnOut,net:txnRemain,accounts}=monthSummary(state);
+  const accountName=id=>accounts.find(a=>a.accountId===id)?.name||'Chưa chọn tài khoản';
   if(el('txn-kpi-in'))  el('txn-kpi-in').textContent=fmt(txnIn);
   if(el('txn-kpi-out')) el('txn-kpi-out').textContent=fmt(txnOut);
   if(el('txn-kpi-remain')){
@@ -284,15 +257,15 @@ export function renderTxnPage(state){
       show.forEach(t=>{
         const row=document.createElement('div');row.className='txn-row';
         row.onclick=()=>window._openTxnEdit&&window._openTxnEdit(t.id);
-        const ico=txnCatIcon(t.name,t.type);
+        const ico=t.type==='transfer'?'⇄':txnCatIcon(t.name,t.type);
         const bg=t.type==='in'?'rgba(76,175,80,.12)':'rgba(255,79,79,.12)';
         row.innerHTML=`
           <div class="txn-cat-ico" style="background:${bg}">${ico}</div>
           <div class="txn-info">
-            <div class="txn-name">${escapeHTML(t.name)}</div>
+            <div class="txn-name">${escapeHTML(t.name)}</div><small class="legacy-entry">${escapeHTML(accountName(t.accountId))}${t.type==='transfer'?' → '+escapeHTML(accountName(t.toAccountId)):''}</small>${isLegacySavingEntry(t)?'<small class="legacy-entry">Tiết kiệm</small>':''}
             ${t.date?`<div style="font-size:10px;color:var(--sub);font-weight:600">${new Date(t.date).toLocaleDateString('vi-VN',{day:'numeric',month:'numeric'})}</div>`:''}
           </div>
-          <div class="txn-amount ${t.type}">${t.type==='in'?'+':'-'}${fmt(t.amount)}</div>`;
+          <div class="txn-amount ${t.type}">${t.type==='transfer'?'':t.type==='in'?'+':'-'}${fmt(t.amount)}</div>`;
         list.appendChild(row);
       });
     }
@@ -328,7 +301,7 @@ export function renderSavingList(savings){
  if(!savings.length){el.innerHTML=`<div style="padding:14px;text-align:center;color:var(--sub);font-size:12px;font-weight:700">Chưa có</div>`;return;}
   [...savings].reverse().forEach(s=>{
     const row=document.createElement('div');row.className='save-row';
-    row.innerHTML=`<div class="save-row-left"><div class="save-row-name">${escapeHTML(s.name)}</div><div class="save-row-date">${escapeHTML(s.date||'')}</div></div>
+    row.innerHTML=`<div class="save-row-left" role="button" tabindex="0" onclick="openSavingModal('${s.id}')"><div class="save-row-name">${escapeHTML(s.name)}</div><div class="save-row-date">${escapeHTML(s.date||'')}</div></div>
       <div style="display:flex;align-items:center;gap:8px"><div class="save-row-amt">+${fmt(s.amount)}</div>
       <button class="s-del" onclick="window.deleteSaving('${s.id}')">✕</button></div>`;
     el.appendChild(row);
@@ -339,39 +312,32 @@ export function renderSavingList(savings){
 
 // ── RENDER SETTINGS ───────────────────────────────────────────
 export function renderSettings({debts, income, expense, savings, txns, walletBase, currentMonth, currentTheme}){
-  renderFinList('income', income);
-  renderFinList('expense', expense);
+ const planLabel=document.getElementById('plan-month-label');if(planLabel)planLabel.textContent='Kế hoạch · '+getML(currentMonth);
+  renderFinList('income', income, recordedEntries(txns[currentMonth]||[]));
+  renderFinList('expense', expense, recordedEntries(txns[currentMonth]||[]));
   renderDebtList('td', debts);
   renderDebtList('tc', debts);
   const activeCount=debts.filter(d=>!d.settled).length;
   const sub=document.getElementById('acc-debt-sub');
   if(sub) sub.textContent=`${activeCount} khoản đang hoạt động`;
-  const wi=document.getElementById('wallet-base-input');
-  if(wi){wi.value=walletBase?fmtNoUnit(walletBase):'';wi.dataset.raw=walletBase;}
-  const wsub=document.getElementById('acc-wallet-sub');
-  if(wsub){
-    const mt=txns[currentMonth]||[];
-    const i=mt.filter(t=>t.type==='in').reduce((s,t)=>s+Number(t.amount),0);
-    const o=mt.filter(t=>t.type==='out').reduce((s,t)=>s+Number(t.amount),0);
-    wsub.textContent=`Hiện tại: ${fmt(walletBase+i-o)}`;
-  }
   renderSavingList(savings);
   setTheme(currentTheme);
 }
 
-function renderFinList(mode, items){
+function renderFinList(mode, items, entries=[]){
   const el=document.getElementById('list-'+mode);if(!el)return;
   if(!items.length){el.innerHTML=`<div style="padding:14px;text-align:center;color:var(--sub);font-size:12px;font-weight:700">Chưa có</div>`;return;}
   el.innerHTML='';
   items.forEach((it,i)=>{
     const row=document.createElement('div');row.className='srow';
     if(i<items.length-1) row.style.borderBottom='1px solid var(--border)';
+    const remaining=planRemaining(it,entries,mode==='income'?'in':'out');
     const ico=mode==='income'?'💵':'🧾';const bg=mode==='income'?'rgba(200,255,87,.1)':'rgba(255,87,87,.1)';
     row.innerHTML=`<div class="s-ico" style="background:${bg}">${ico}</div>
       <div class="s-info" onclick="openFinEdit('${mode}','${it.id}')">
         <div class="s-name">${escapeHTML(it.name)}</div>
-        <div class="s-val fin-val">${fmt(it.amount)} <span style="font-weight:600;color:var(--sub)">${escapeHTML(it.note||'')}</span></div>
-      </div><button class="s-del" onclick="confirmDelFin('${mode}','${it.id}')">✕</button>`;
+        <div class="s-val fin-val">${fmt(it.amount)} · Còn ${fmt(remaining)} <span style="font-weight:600;color:var(--sub)">${escapeHTML(it.note||'')}</span></div>
+      </div><button class="note-link" ${remaining<=0?'disabled':''} onclick="openPlanPayment('${mode}','${it.id}')">${remaining<=0?'Hoàn tất':mode==='income'?'Nhận tiền':'Thanh toán'}</button><button class="s-del" onclick="confirmDelFin('${mode}','${it.id}')">✕</button>`;
     el.appendChild(row);
   });
 }
@@ -494,7 +460,7 @@ export function renderAnalyze({debts, income, expense}){
   // FIX UX: Nếu chưa nhập thu nhập, không hiện điểm misleading
   if(!totalIncome){
     el.innerHTML=`<div style="padding:20px;text-align:center;color:var(--sub);font-size:13px;font-weight:700">
-      ⚠️ Chưa có dữ liệu thu nhập.<br>Vào <b>Cài đặt → Thu nhập</b> để nhập lương/thu nhập cố định.
+      Chưa ghi dự thu để tham khảo kế hoạch.<br>Vào <b>Thu chi → Kế hoạch</b> để ghi dự thu.
     </div>`;
     return;
   }
@@ -510,7 +476,7 @@ export function renderAnalyze({debts, income, expense}){
     payoffItems+=`<div class="analyze-item"><span class="analyze-key">${escapeHTML(d.name)}</span><span class="analyze-val" style="font-size:12px">${nd.toLocaleDateString('vi-VN',{month:'numeric',year:'numeric'})} (còn ${rem} kỳ)</span></div>`;
   });
   el.innerHTML=`<div class="analyze-score"><div class="analyze-score-num" style="color:${scoreColor}">${score}</div>
-    <div class="analyze-score-label">Điểm sức khoẻ tài chính · ${scoreLabel}</div></div>
+    <div class="analyze-score-label">Tham khảo theo kế hoạch · ${scoreLabel}</div></div>
     <div class="analyze-item"><span class="analyze-key">Tỉ lệ nợ / thu nhập</span><span class="analyze-val" style="color:${debtRatio>40?'var(--red)':'var(--accent)'}">${debtRatio}%</span></div>
     <div class="analyze-item"><span class="analyze-key">Tỉ lệ chi phí / thu nhập</span><span class="analyze-val">${expenseRatio}%</span></div>
     <div class="analyze-item"><span class="analyze-key">Tỉ lệ tự do</span><span class="analyze-val" style="color:var(--purple)">${remainRatio}%</span></div>
@@ -522,29 +488,16 @@ export function renderAnalyze({debts, income, expense}){
 // ── RENDER REPORT ─────────────────────────────────────────────
 let donutChart=null;
 
+
 export function renderReport(state){
- const {debts,income,expense,txns,savings,currentMonth}=state;
-  const el=id=>document.getElementById(id);
-  if(el('report-month-label')) el('report-month-label').textContent=getML(currentMonth);
-  const m=parseInt(currentMonth.split('-')[1]);
-  if(el('rpt-title')) el('rpt-title').textContent=`Tổng quan tháng ${m}`;
-
-  const {totalIn,fixedExpense,totalOut:totalExpense,txnOut,totalDebtPay,available:conDu}=monthSummary(state);
- const monthTxns=txns[currentMonth]||[];
-  if(el('rpt-income'))  el('rpt-income').textContent=fmt(totalIn);
-  if(el('rpt-expense')) el('rpt-expense').textContent=fmt(totalExpense);
-  if(el('rpt-expense-fixed')) el('rpt-expense-fixed').textContent=fmt(fixedExpense);
-  if(el('rpt-expense-extra')) el('rpt-expense-extra').textContent=fmt(txnOut);
-  if(el('rpt-debt-pay')) el('rpt-debt-pay').textContent=fmt(totalDebtPay);
-  if(el('rpt-saving')){
-    el('rpt-saving').textContent=conDu>=0?fmt(conDu):'-'+fmt(Math.abs(conDu));
-    el('rpt-saving').style.color=conDu>=0?'var(--purple)':'var(--red)';
-  }
-
-  // FIX: truyền fixedExpense (không có txnOut) vào donut
-  renderDonutChart(fixedExpense, monthTxns);
+  const s=monthSummary(state),set=(id,value)=>{const el=document.getElementById(id);if(el)el.textContent=value;};
+  set('rpt-title','Sổ thu chi · '+getML(state.currentMonth));
+  set('rpt-income',fmt(s.totalIn));set('rpt-expense',fmt(s.totalOut));
+  set('rpt-expense-fixed',fmt(s.fixedExpense));set('rpt-expense-extra',fmt(s.fixedIncome));
+  set('rpt-debt-pay',fmt(s.paidDebt));set('rpt-saving',fmt(s.net));
+  const remain=document.getElementById('rpt-saving');if(remain)remain.style.color=s.net>=0?'var(--purple)':'var(--red)';
+  renderDonutChart(0,recordedEntries(state.txns[state.currentMonth]||[]));
 }
-
 const CAT_GROUPS=[
   {label:'Ăn uống',   color:'#4CAF50', match:/ăn|food|cơm|phở|nhà hàng|cafe/i},
   {label:'Gia đình',  color:'#2196F3', match:/gia đình|sinh hoạt|nhà/i},

@@ -1,5 +1,6 @@
 
-const clone=x=>JSON.parse(JSON.stringify(x));
+const sortMaps=value=>Array.isArray(value)?value.map(sortMaps):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(key=>[key,sortMaps(value[key])])):value;
+const clone=x=>sortMaps(JSON.parse(JSON.stringify(x)));
 const now=new Date(),month=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
 let data={debts:[{id:'demo-card',name:'Thẻ chi tiêu',type:'td',used:12500000,limit:50000000,monthly:650000,payDay:25,note:'Chi tiêu hàng tháng'},{id:'demo-loan',name:'Khoản vay cá nhân',type:'tc',principal:60000000,rate:12,totalTerm:24,curTerm:6,method:'fixed_principal',payDay:20,rateConverted:true}],income:[{id:'salary',name:'Lương',amount:28000000}],expense:[{id:'rent',name:'Tiền nhà',amount:6500000}],ticks:{},txns:{[month]:[{id:'t1',name:'Cà phê cùng bạn',type:'out',amount:85000,date:month+'-15'},{id:'t2',name:'Freelance thiết kế',type:'in',amount:3500000,date:month+'-14'},{id:'t3',name:'Mua sắm cuối tuần',type:'out',amount:1250000,date:month+'-13'},{id:'t4',name:'Ăn trưa',type:'out',amount:65000,date:month+'-12'}]},savings:[{id:'s1',name:'Quỹ du lịch',amount:5000000,date:'01/09/2026'}],loanBook:[{id:'l1',name:'Minh',amount:1000000,note:'Mượn đầu tháng'}],walletBase:2000000,lastAutoMonth:month};
 

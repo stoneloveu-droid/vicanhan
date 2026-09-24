@@ -144,7 +144,15 @@ export function monthSummary({debts=[],income=[],expense=[],ticks={},txns={},sav
     debtLeft:debts.filter(d=>!d.settled).reduce((s,d)=>s+(d.type==='tc'?tcGetDebt(d):Number(d.used)||0),0)};
 }
 // Merge independent changes, reject competing edits instead of overwriting.
-const equal = (a,b) => JSON.stringify(a) === JSON.stringify(b);
+// Firestore map field order is not significant; array item order still is.
+function equal(a,b) {
+  if(a===b) return true;
+  if(!a||!b||typeof a!=='object'||typeof b!=='object') return false;
+  if(Array.isArray(a)||Array.isArray(b))
+    return Array.isArray(a)&&Array.isArray(b)&&a.length===b.length&&a.every((value,i)=>equal(value,b[i]));
+  const keys=Object.keys(a);
+  return keys.length===Object.keys(b).length&&keys.every(key=>Object.hasOwn(b,key)&&equal(a[key],b[key]));
+}
 export function mergeState(base, local, remote, path='') {
   if(equal(local,base)) return remote;
   if(equal(remote,base) || equal(local,remote)) return local;

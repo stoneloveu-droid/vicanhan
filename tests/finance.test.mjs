@@ -146,3 +146,17 @@ test('due dates clamp to the last day of the selected month',()=>{
  assert.equal(dueDate('2028-02',31),'2028-02-29');
  assert.equal(dueDate('2026-10',15),'2026-10-15');
 });
+
+test('undo payment ignores Firestore map key ordering but preserves real conflicts',()=>{
+ const payment={amount:650000,principal:0,interest:0,previousTerm:0,advanced:false,date:'2026-09-24',txnId:'t-paid'};
+ const entry={id:'t-paid',name:'Trả nợ',amount:650000,type:'out',date:'2026-09-24',accountId:'cash'};
+ const sortMaps=value=>Array.isArray(value)?value.map(sortMaps):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(key=>[key,sortMaps(value[key])])):value;
+ const base={ticks:{'2026-09':{card:payment}},txns:{'2026-09':[entry]}};
+ const local={ticks:{'2026-09':{}},txns:{'2026-09':[]}};
+ const remote=sortMaps(base);
+ assert.deepEqual(mergeState(base,local,remote),local);
+ const changed=structuredClone(remote);changed.txns['2026-09'][0].amount=700000;
+ assert.throws(()=>mergeState(base,local,changed));
+ const retick=structuredClone(base);retick.ticks['2026-09'].card.txnId='t-new';retick.txns['2026-09'][0].id='t-new';
+ assert.deepEqual(mergeState(base,retick,remote),retick);
+});

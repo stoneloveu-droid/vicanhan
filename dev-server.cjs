@@ -8,5 +8,5 @@ http.createServer((req,res)=>{
  const target=path.resolve(root,relative);
  if(!target.startsWith(root+path.sep)||relative.startsWith('.')||relative.startsWith('tests/')){res.writeHead(403);return res.end();}
  const file=demo&&relative==='firebase.js'?path.join(root,'tests','firebase.mock.js'):target;
- fs.readFile(file,(error,body)=>{if(error){res.writeHead(404);return res.end('Not found');}res.setHeader('Content-Type',types[path.extname(file)]||'application/octet-stream');res.setHeader('Cache-Control','no-store');if(demo&&relative==='index.html')body=Buffer.from(body.toString().replace('MY MONEY / MY FLOW','BẢN XEM THỬ · DỮ LIỆU MẪU'));res.end(body);});
+ fs.readFile(file,(error,body)=>{if(error){res.writeHead(404);return res.end('Not found');}res.setHeader('Content-Type',types[path.extname(file)]||'application/octet-stream');res.setHeader('Cache-Control','no-store');if(demo&&relative==='index.html')body=Buffer.from(body.toString().replace('<!-- dashboard-preview -->','<div class="dashboard-preview">BẢN XEM THỬ · DỮ LIỆU MẪU</div>'));res.end(body);});
 }).listen(port,'127.0.0.1',()=>console.log('Preview: http://127.0.0.1:'+port+(demo?' (sample data, no Firebase)':'')));

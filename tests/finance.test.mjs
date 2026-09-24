@@ -1,12 +1,12 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {monthSummary,mergeState,escapeHTML,localDate,balanceSummary,balanceEntries,recordedEntries} from '../finance.js';
+import {dueDate,plansForMonth,changePlan,monthSummary,mergeState,escapeHTML,localDate,balanceSummary,balanceEntries,recordedEntries} from '../finance.js';
 import {tcScheduleTable,tcPaymentAtTerm,migrateRate} from '../calc.js';
-test('notes, plans, savings and debt never alter recorded income or expenses',()=>{
+test('notes and savings do not change cash flow; legacy paid debt is included once',()=>{
  const s={currentMonth:'2026-09',walletBase:100,income:[{amount:1000}],expense:[{amount:200}],savings:[{amount:800}],txns:{'2026-09':[{type:'out',amount:50}]},debts:[{id:'a',type:'td',monthly:300}],ticks:{}};
  const x=monthSummary(s);assert.equal(x.balanceTotal,100);assert.equal(x.net,-50);assert.equal(x.totalIn,0);assert.equal(x.totalOut,50);assert.equal(x.fixedIncome,1000);assert.equal(x.fixedExpense,200);assert.equal(x.savingTotal,800);
- s.ticks={'2026-09':{a:{amount:300}}};const y=monthSummary(s);assert.equal(y.balanceTotal,100);assert.equal(y.net,-50);assert.equal(y.paidDebt,300);
+ s.ticks={'2026-09':{a:{amount:300}}};const y=monthSummary(s);assert.equal(y.balanceTotal,100);assert.equal(y.net,-350);assert.equal(y.paidDebt,300);
  s.debts=[];assert.equal(monthSummary(s).paidDebt,300);
 });
 test('latest note per named account is summed, not all history',()=>{
@@ -77,4 +77,72 @@ test('debt payment releases reserve while reducing the source balance once',()=>
 test('future entries are excluded and overspending remains negative',()=>{
  const state={today:'2026-09-20',currentMonth:'2026-09',balanceNotes:[{id:'a',name:'Wallet',amount:100,date:'2026-09-01'}],expense:[{id:'e',amount:200}],txns:{'2026-09':[{id:'future',accountId:'a',type:'in',amount:1000,date:'2026-09-25'}]}};
  const s=monthSummary(state);assert.equal(s.available,-100);assert.equal(s.totalIn,0);assert.equal(s.balanceTotal,100);
+});
+
+test('debt ticks, forecast and actual expenses stay aligned without double counting',()=>{
+ const state={currentMonth:'2026-09',today:'2026-09-24',income:[],expense:[],debts:[{id:'d',type:'td',monthly:300}],txns:{},ticks:{}};
+ let s=monthSummary(state);assert.equal(s.plannedExpense,300);assert.equal(s.reserved,300);assert.equal(s.totalOut,0);
+ state.ticks={'2026-09':{d:{amount:300}}};s=monthSummary(state);
+ assert.equal(s.plannedExpense,300);assert.equal(s.reserved,0);assert.equal(s.paidPlanned,300);assert.equal(s.totalOut,300);
+ state.txns={'2026-09':[{id:'t',type:'out',amount:300,debtId:'d',date:'2026-09-24'}]};
+ s=monthSummary(state);assert.equal(s.totalOut,300);assert.equal(s.legacyDebtCount,0);
+ state.txns['2026-09'].push({id:'extra',type:'out',amount:50,date:'2026-09-24'});
+ s=monthSummary(state);assert.equal(s.totalOut,350);assert.equal(s.reserved,0);assert.equal(s.paidPlanned,300);
+});
+test('linked debt plans are not reserved twice; unrelated living costs remain due',()=>{
+ const state={currentMonth:'2026-09',today:'2026-09-24',debts:[{id:'d',type:'td',monthly:300}],expense:[{id:'mirror',debtId:'d',amount:300},{id:'rent',amount:200}],txns:{},ticks:{}};
+ assert.equal(monthSummary(state).reserved,500);
+ state.ticks={'2026-09':{d:{amount:300}}};
+ const s=monthSummary(state);assert.equal(s.reserved,200);assert.equal(s.plannedExpense,500);assert.equal(s.paidPlanned,300);
+ state.txns={'2026-09':[{id:'paid',type:'out',planId:'rent',amount:200,date:'2026-09-24'}]};
+ assert.equal(monthSummary(state).reserved,0);assert.equal(monthSummary(state).totalOut,500);
+});
+test('recurring changes start in the selected month, retain history and repeat next month',()=>{
+ let state={income:[],expense:[{id:'rent',name:'Rent',amount:200}],monthlyPlans:{},recurringPlans:{}};
+ state={...state,...changePlan(state,'2026-09','expense',{id:'rent',name:'Rent',amount:250},'recurring')};
+ assert.equal(plansForMonth(state,'2026-08').expense[0].amount,200);
+ assert.equal(plansForMonth(state,'2026-09').expense[0].amount,250);
+ assert.equal(plansForMonth(state,'2026-10').expense[0].amount,250);
+ state={...state,...changePlan(state,'2026-10','expense',{id:'trip',name:'Trip',amount:100},'month')};
+ assert.equal(plansForMonth(state,'2026-10').expense.length,2);
+ assert.equal(plansForMonth(state,'2026-11').expense.length,1);
+ state={...state,...changePlan(state,'2026-11','expense',{id:'rent'},'recurring',true)};
+ assert.equal(plansForMonth(state,'2026-10').expense.length,2);
+ assert.equal(plansForMonth(state,'2026-11').expense.length,0);
+ assert.equal(plansForMonth(state,'2026-12').expense.length,0);
+});
+test('legacy monthly overrides are preserved and recurring additions update the selected month',()=>{
+ let state={income:[],expense:[{id:'rent',name:'Rent',amount:200}],monthlyPlans:{'2026-09':{income:[],expense:[{id:'rent',name:'Rent',amount:220}]}},recurringPlans:{}};
+ state={...state,...changePlan(state,'2026-09','income',{id:'salary',name:'Salary',amount:1000},'recurring')};
+ assert.equal(plansForMonth(state,'2026-09').expense[0].amount,220);
+ assert.equal(plansForMonth(state,'2026-10').expense[0].amount,200);
+ assert.equal(plansForMonth(state,'2026-10').income[0].amount,1000);
+});
+
+test('month-only overrides do not block unrelated recurring additions or later edits',()=>{
+ let state={income:[],expense:[{id:'rent',amount:200}],monthlyPlans:{},recurringPlans:{}};
+ state={...state,...changePlan(state,'2026-10','expense',{id:'trip',amount:100},'month')};
+ state={...state,...changePlan(state,'2026-09','expense',{id:'internet',amount:30},'recurring')};
+ assert.deepEqual(plansForMonth(state,'2026-10').expense.map(x=>x.id).sort(),['internet','rent','trip']);
+ state={...state,...changePlan(state,'2026-09','expense',{id:'rent',amount:250},'recurring')};
+ assert.equal(plansForMonth(state,'2026-10').expense.find(x=>x.id==='rent').amount,250);
+});
+test('recurring edits flow through unrelated future versions, preserving explicit future edits',()=>{
+ let state={income:[],expense:[{id:'rent',amount:200}],monthlyPlans:{},recurringPlans:{}};
+ state={...state,...changePlan(state,'2026-10','income',{id:'salary',amount:1000},'recurring')};
+ state={...state,...changePlan(state,'2026-11','expense',{id:'rent',amount:300},'recurring')};
+ state={...state,...changePlan(state,'2026-09','expense',{id:'rent',amount:250},'recurring')};
+ assert.equal(plansForMonth(state,'2026-10').expense[0].amount,250);
+ assert.equal(plansForMonth(state,'2026-11').expense[0].amount,300);
+ assert.equal(plansForMonth(state,'2026-10').income[0].amount,1000);
+});
+
+test('deleting a debt does not resurrect its linked recurring expense',()=>{
+ const state={currentMonth:'2026-09',today:'2026-09-24',debts:[],expense:[{id:'p',debtId:'deleted',amount:300}]};
+ assert.equal(monthSummary(state).reserved,0);assert.equal(monthSummary(state).plannedExpense,0);
+});
+test('due dates clamp to the last day of the selected month',()=>{
+ assert.equal(dueDate('2026-02',31),'2026-02-28');
+ assert.equal(dueDate('2028-02',31),'2028-02-29');
+ assert.equal(dueDate('2026-10',15),'2026-10-15');
 });

@@ -12,6 +12,10 @@ if(new URLSearchParams(location.search).has('ledger')){
  data={...data,debts:[],income:[{id:'salary',name:'Lương',amount:28000000}],expense:[{id:'rent',name:'Tiền nhà',amount:7000000}],ticks:{},txns:{},savings:[],balanceNotes:[{id:'cash',name:'Tiền mặt',kind:'cash',amount:2000000,date:month+'-01',includedTxnIds:[]},{id:'bank',name:'Ngân hàng cá nhân',kind:'bank',amount:8000000,date:month+'-01',includedTxnIds:[]}]};
 }
 
+if(new URLSearchParams(location.search).has('paid-legacy')){
+ data.ticks={[month]:{'demo-card':{amount:650000},'demo-loan':{amount:2950000}}};
+}
+
 let listener;const snapshot=()=>({exists:()=>!!data,data:()=>clone(data)});
 export const auth={currentUser:{uid:'preview-only',displayName:'Ví trải nghiệm',email:'Dữ liệu mẫu · Không kết nối Firebase',isAnonymous:false}};
 export const db={};export const doc=()=>({});

@@ -7,7 +7,7 @@ const fs=require('fs'),assert=require('assert/strict');
  page.setDefaultTimeout(12000);const errors=[];page.on('pageerror',e=>errors.push(e.message));
  const data=()=>page.evaluate(()=>window.__previewData());
  const tab=n=>page.click('#nav-'+n);
- const save=async modal=>{await page.click(modal+' .mbtn-save');await page.waitForSelector(modal,{state:'hidden'});};
+ const save=async modal=>{await page.click(modal+' .mbtn-save');try{await page.waitForSelector(modal,{state:'hidden'});}catch(e){console.error('Save diagnostics',await page.locator('#toast').textContent(),await page.locator('#txn-date').inputValue(),await page.locator('#txn-amount').inputValue(),await page.locator('#txn-name').inputValue(),await page.locator('#txn-amount').getAttribute('data-raw'));throw e;}};
  const expectText=async(id,text)=>assert.equal(await page.locator('#'+id).textContent(),text);
  const transaction=async(type,name,amount,account='cash')=>{
   await page.evaluate(t=>window.openTxnModalType(t),type);
@@ -54,7 +54,7 @@ const fs=require('fs'),assert=require('assert/strict');
 
  await tab('txn');await page.locator('.mnav-btn').first().click();await tab('home');await expectText('available-amount','7.000.000đ');
  await tab('txn');await page.locator('.mnav-btn').last().click();await tab('home');await expectText('available-amount','43.000.000đ');
- await tab('txn');await page.evaluate(()=>window.shareTxnReport());assert((await page.locator('#share-txn-text').inputValue()).includes('Có thể chi thêm: -12.600.000đ'));await page.click('#modal-share-txn .mbtn-cancel');
+ await tab('txn');await page.evaluate(()=>window.shareTxnReport());assert((await page.locator('#share-txn-text').inputValue()).includes('Ước tính có thể chi: -12.600.000đ'));await page.click('#modal-share-txn .mbtn-cancel');
  // Account names and transaction names are rendered as text.
  await transaction('out','<img src=x onerror=alert(1)>',1000);await save('#modal-txn');await tab('txn');assert.equal(await page.locator('#txn-list img').count(),0);
  // Debt confirmation writes a linked expense; undo reverses balance and loan term together.
@@ -66,6 +66,28 @@ const fs=require('fs'),assert=require('assert/strict');
  assert(paid.txns[month].some(t=>t.id===mark.txnId&&t.debtId===loan.id&&t.accountId==='bank'));
  await page.click('#cb-demo-loan');await page.waitForFunction(id=>!Object.values(window.__previewData().ticks).some(m=>m[id]),loan.id);
  const undone=await data();assert.equal(undone.debts.find(d=>d.id===loan.id).curTerm,loan.curTerm);assert.deepEqual(undone.txns,initial.txns);
+
+ // Repeat ticks use the remembered account without opening a form.
+ assert.equal(undone.debts.find(d=>d.id===loan.id).paymentAccountId,'bank');
+ for(let i=0;i<3;i++){
+  await page.click('#cb-demo-loan');
+  await page.waitForFunction(id=>Object.values(window.__previewData().ticks).some(m=>m[id]),loan.id);
+  assert(!(await page.locator('#modal-txn').evaluate(e=>e.classList.contains('open'))));
+  const repeat=await data();assert.equal(repeat.txns[month].filter(t=>t.debtId===loan.id).length,1);
+  assert.equal(repeat.debts.find(d=>d.id===loan.id).curTerm,loan.curTerm+1);
+  await page.click('#cb-demo-loan');
+  await page.waitForFunction(id=>!Object.values(window.__previewData().ticks).some(m=>m[id]),loan.id);
+  assert.deepEqual((await data()).txns,initial.txns);
+ }
+ const beforeQuickFailure=await data();await page.evaluate(()=>window.__failSave=true);
+ await page.click('#cb-demo-loan');await page.waitForTimeout(350);
+ assert.deepEqual(await data(),beforeQuickFailure);assert(!(await page.locator('#cb-demo-loan').evaluate(e=>e.classList.contains('checked'))));
+ await page.evaluate(()=>window.__failSave=false);
+ // The saved source can still be changed through payment details.
+ await page.evaluate(id=>window.editDebtPayment(id),loan.id);
+ await page.selectOption('#txn-account','cash');await save('#modal-txn');
+ assert.equal((await data()).debts.find(d=>d.id===loan.id).paymentAccountId,'cash');
+ await page.click('#cb-demo-loan');await page.waitForFunction(id=>!Object.values(window.__previewData().ticks).some(m=>m[id]),loan.id);
  // Legacy records survive and do not acquire a made-up account.
  await tab('txn');assert((await page.locator('#legacy-saving-hint').textContent()).includes('tiết kiệm'));
  // Tools and all five tabs remain usable on small screens.

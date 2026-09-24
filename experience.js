@@ -36,7 +36,7 @@ document.querySelectorAll('.modal-bg').forEach(modal=>{
   let wasOpen=false;
   new MutationObserver(()=>{
     const open=modal.classList.contains('open');if(open===wasOpen)return;wasOpen=open;
-    if(open){savedFocus=document.activeElement;accessibleControls();setTimeout(()=>modal.querySelector('input,select,button,[tabindex="0"]')?.focus({preventScroll:true}),80);}
+    if(open){savedFocus=document.activeElement;accessibleControls();setTimeout(()=>{if(modal.classList.contains('open')&&!modal.contains(document.activeElement))modal.querySelector('input,select,button,[tabindex="0"]')?.focus({preventScroll:true});},80);}
     else if(savedFocus?.isConnected)savedFocus.focus({preventScroll:true});
   }).observe(modal,{attributes:true,attributeFilter:['class']});
 });

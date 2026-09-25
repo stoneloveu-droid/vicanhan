@@ -11,7 +11,7 @@ const assert=require('assert/strict');
  await p.waitForFunction(()=>document.querySelector('#hero-balance').textContent==='30.000.000đ');
  const manage=async()=>{await p.click('#nav-settings');await p.click('.management-link');};
  const toggle=async()=>{await p.locator('#list-td .s-info').click();await p.click('#md-del');await p.click('#ca-ok');await p.waitForSelector('#modal-debt',{state:'hidden'});};
- await p.click('#nav-paid');await p.click('#cb-demo-card');await p.selectOption('#txn-account','bank');await p.click('#modal-txn .mbtn-save');await p.waitForSelector('#modal-txn',{state:'hidden'});
+ await p.click('#nav-paid');await p.click('#cb-demo-card');await p.waitForFunction(()=>Object.values(window.__previewData().ticks).some(m=>m['demo-card']));
  const paid=await p.evaluate(()=>window.__previewData());
  await manage();await toggle();
  const stopped=await p.evaluate(()=>window.__previewData());
@@ -26,7 +26,7 @@ const assert=require('assert/strict');
  assert((await p.locator('#remaining-items').textContent()).includes('Tiền nhà'));
  await p.click('#nav-txn');await p.click('.fin-fixed-btn');
  assert.equal(await p.locator('#page-monthly .s-del,#page-monthly .add-row').count(),0);
- await p.locator('#monthly-expense .note-link').click();await p.selectOption('#txn-account','bank');await p.click('#modal-txn .mbtn-save');await p.waitForSelector('#modal-txn',{state:'hidden'});
+ await p.locator('#monthly-expense .note-link').click();await p.click('#modal-txn .mbtn-save');await p.waitForSelector('#modal-txn',{state:'hidden'});
  await p.locator('#monthly-expense .note-link').click();await p.waitForFunction(()=>!document.body.classList.contains('saving'));
  await p.click('#nav-home');assert.equal(await p.locator('#hero-reserved').textContent(),'10.100.000đ');
  for(const width of [320,390,430]){

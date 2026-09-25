@@ -27,7 +27,7 @@ const assert=require('assert/strict');
  // New recurring income repeats, while actual receipt belongs only to this month.
  await p.evaluate(()=>shiftMonth(1));await p.locator('#page-finance .add-row').first().click();
  await p.fill('#mf-name','Thu nhập phụ');await p.fill('#mf-amount','1000000');await save('#modal-fin');
- await openMonthly();await p.locator('#monthly-income .srow').filter({hasText:'Thu nhập phụ'}).locator('.note-link').click();await p.selectOption('#txn-account','cash');await save('#modal-txn');
+ await openMonthly();await p.locator('#monthly-income .srow').filter({hasText:'Thu nhập phụ'}).locator('.note-link').click();await save('#modal-txn');
  assert((await p.locator('#monthly-income .srow').filter({hasText:'Thu nhập phụ'}).textContent()).includes('Hoàn tác'));
  await p.evaluate(()=>shiftMonth(1));assert((await p.locator('#monthly-income .srow').filter({hasText:'Thu nhập phụ'}).textContent()).includes('Còn 1.000.000đ'));
  // Clearing every debt reduces remaining forecast, but leaves unpaid living expenses.
@@ -36,9 +36,9 @@ const assert=require('assert/strict');
  await openPlan();await p.locator('#page-finance .add-row').nth(1).click();await p.fill('#mf-name','Trả thẻ');await p.fill('#mf-amount','650000');await p.selectOption('#mf-debt','demo-card');await save('#modal-fin');
  await p.click('#nav-home');await text('hero-planned','10.100.000đ');
  await p.click('#nav-paid');
- for(const id of ['demo-card','demo-loan']){await p.click('#cb-'+id);await p.selectOption('#txn-account','bank');await save('#modal-txn');}
+ for(const id of ['demo-card','demo-loan']){await p.click('#cb-'+id);await p.waitForFunction(id=>Object.values(window.__previewData().ticks).some(m=>m[id]),id);}
  await p.click('#nav-home');await text('hero-reserved','6.500.000đ');await text('kpi-debt-pay-mini','0đ');await text('hero-paid-planned','3.600.000đ');await text('rpt-expense','5.000.000đ');await text('donut-total','5.000.000đ');
- await openMonthly();await p.locator('#monthly-expense .srow').filter({hasText:'Tiền nhà'}).locator('.note-link').click();await p.selectOption('#txn-account','bank');await save('#modal-txn');
+ await openMonthly();await p.locator('#monthly-expense .srow').filter({hasText:'Tiền nhà'}).locator('.note-link').click();await save('#modal-txn');
  await p.click('#nav-home');await text('hero-reserved','0đ');await text('hero-paid-planned','10.100.000đ');await text('rpt-expense','11.500.000đ');await text('donut-total','11.500.000đ');
  await p.click('#nav-paid');await p.click('#cb-demo-card');await p.waitForFunction(()=>!Object.values(window.__previewData().ticks).some(m=>m['demo-card']));
  await p.click('#nav-home');await text('hero-reserved','650.000đ');await text('hero-paid-planned','9.450.000đ');await text('rpt-expense','10.850.000đ');

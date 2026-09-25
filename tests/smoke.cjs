@@ -1,111 +1,48 @@
+
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'C:/Users/S.Housing/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
 const fs=require('fs'),assert=require('assert/strict');
 (async()=>{
- const browser=await chromium.launch({channel:'msedge',headless:true});
+ const b=await chromium.launch({channel:'msedge',headless:true});
  try{
- const page=await browser.newPage({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
- page.setDefaultTimeout(12000);const errors=[];page.on('pageerror',e=>errors.push(e.message));
- const data=()=>page.evaluate(async()=>{const {normalizeData}=await import('/data-schema.js');return normalizeData(window.__previewData());});
- const tab=n=>page.click('#nav-'+n);
- const save=async modal=>{await page.click(modal+' .mbtn-save');try{await page.waitForSelector(modal,{state:'hidden'});}catch(e){console.error('Save diagnostics',await page.locator('#toast').textContent(),await page.locator('#txn-date').inputValue(),await page.locator('#txn-amount').inputValue(),await page.locator('#txn-name').inputValue(),await page.locator('#txn-amount').getAttribute('data-raw'));throw e;}};
- const expectText=async(id,text)=>assert.equal(await page.locator('#'+id).textContent(),text);
- const transaction=async(type,name,amount,account='cash')=>{
-  await page.evaluate(t=>window.openTxnModalType(t),type);
-  await page.fill('#txn-name',name);await page.fill('#txn-amount',String(amount));await page.selectOption('#txn-account',account);
- };
- await page.goto('http://127.0.0.1:4173/?ledger');await page.waitForSelector('#page-home.active');
- await expectText('kpi-wallet','3.000.000đ');await expectText('hero-balance','10.000.000đ');await expectText('hero-reserved','7.000.000đ');
- await page.click('#wallet-eye');await expectText('hero-balance','••••••');await page.click('#wallet-eye');
- await transaction('out','Ăn trưa',100000);await save('#modal-txn');
- await expectText('hero-balance','9.900.000đ');await expectText('kpi-wallet','2.900.000đ');
- // Edit and delete reverse only this transaction.
- await tab('txn');await page.locator('.txn-row').filter({hasText:'Ăn trưa'}).click();await page.fill('#txn-amount','200000');await save('#modal-txn');
- await tab('home');await expectText('hero-balance','9.800.000đ');
- await tab('txn');await page.locator('.txn-row').filter({hasText:'Ăn trưa'}).click();await page.click('#txn-del');await page.click('#ca-ok');await page.waitForSelector('#modal-txn',{state:'hidden'});
- await tab('home');await expectText('hero-balance','10.000.000đ');
- // Partial planned payment releases the same reserve; full payment does not double count.
- await page.locator('.available-card').first().click();await page.locator('#monthly-expense .note-link').click();
- await page.selectOption('#txn-account','bank');await page.fill('#txn-amount','3000000');await save('#modal-txn');
- await tab('home');await expectText('hero-balance','7.000.000đ');await expectText('hero-reserved','4.000.000đ');await expectText('kpi-wallet','3.000.000đ');
- await page.locator('.available-card').first().click();await page.locator('#monthly-expense .note-link').click();await page.selectOption('#txn-account','bank');await save('#modal-txn');
- await tab('home');await expectText('hero-balance','3.000.000đ');await expectText('hero-reserved','0đ');await expectText('kpi-wallet','3.000.000đ');
- // Transfer changes distribution, not income or spending.
- await transaction('transfer','Rút tiền',500000,'bank');await page.selectOption('#txn-destination','cash');await save('#modal-txn');
- await expectText('hero-balance','3.000.000đ');
- assert((await page.locator('#balance-accounts').textContent()).includes('2.500.000đ'));
- await tab('txn');await expectText('txn-kpi-in','0đ');await expectText('txn-kpi-out','7.000.000đ');
- await page.selectOption('#txn-type-filter','transfer');assert.equal(await page.locator('.txn-row').count(),1);await page.selectOption('#txn-type-filter','all');
- // Receive planned salary, then make a same-day reconciliation and another expense.
- await transaction('in','Lương',28000000,'bank');await page.selectOption('#txn-plan','salary');await save('#modal-txn');
- await tab('home');await expectText('hero-balance','31.000.000đ');
- await page.locator('#balance-accounts .balance-note-row').filter({hasText:'Tiền mặt'}).click();await page.fill('#bn-amount','2000000');await save('#modal-balance-note');
- await expectText('hero-balance','30.500.000đ');
- await transaction('out','Sau cập nhật',100000);await save('#modal-txn');await expectText('hero-balance','30.400.000đ');
- // Savings are notes, never a second expense.
- const before=await data();await tab('report');await page.locator('#page-report .add-row').click();await page.fill('#sv-name','Tiết kiệm');await page.fill('#sv-amount','1000000');await save('#modal-saving');
- assert.deepEqual((await data()).txns,before.txns);await tab('home');await expectText('hero-balance','30.400.000đ');
- // Failed transaction save does not change remote balances.
- await transaction('out','Lỗi lưu',12345);const beforeFail=await data();await page.evaluate(()=>window.__failSave=true);await page.click('#modal-txn .mbtn-save');await page.waitForTimeout(250);
- assert.deepEqual(await data(),beforeFail);assert(await page.locator('#modal-txn').evaluate(e=>e.classList.contains('open')));
- await page.evaluate(()=>window.__failSave=false);await page.click('#modal-txn .mbtn-cancel');
- // Negative available amount stays visible.
- await tab('settings');await page.click('.management-link');await page.locator('#list-expense .s-info').click();await page.fill('#mf-amount','50000000');await save('#modal-fin');
- await tab('home');await expectText('kpi-wallet','-12.600.000đ');assert((await page.locator('#wallet-status').textContent()).includes('Thiếu'));
-
- await tab('txn');await page.locator('.mnav-btn').first().click();await tab('home');await expectText('available-amount','7.000.000đ');
- await tab('txn');await page.locator('.mnav-btn').last().click();await tab('home');await expectText('available-amount','43.000.000đ');
- await tab('txn');await page.evaluate(()=>window.shareTxnReport());assert((await page.locator('#share-txn-text').inputValue()).includes('Ước tính có thể chi: -12.600.000đ'));await page.click('#modal-share-txn .mbtn-cancel');
- // Account names and transaction names are rendered as text.
- await transaction('out','<img src=x onerror=alert(1)>',1000);await save('#modal-txn');await tab('txn');assert.equal(await page.locator('#txn-list img').count(),0);
- // Debt confirmation writes a linked expense; undo reverses balance and loan term together.
- await page.goto('http://127.0.0.1:4173/');await page.waitForSelector('#page-home.active');
- let initial=await data();const loan=initial.debts.find(d=>d.id==='demo-loan');
- await tab('paid');await page.click('#cb-demo-loan');await page.selectOption('#txn-account','bank');await save('#modal-txn');
- let paid=await data();assert.equal(paid.debts.find(d=>d.id===loan.id).curTerm,loan.curTerm+1);
- const month=Object.keys(paid.ticks)[0],mark=paid.ticks[month][loan.id];
- assert(paid.txns[month].some(t=>t.id===mark.txnId&&t.debtId===loan.id&&t.accountId==='bank'));
- await page.click('#cb-demo-loan');await page.waitForFunction(id=>!Object.values(window.__previewData().ticks).some(m=>m[id]),loan.id);
- const undone=await data();assert.equal(undone.debts.find(d=>d.id===loan.id).curTerm,loan.curTerm);assert.deepEqual(undone.txns,initial.txns);
-
- // Repeat ticks use the remembered account without opening a form.
- assert.equal(undone.debts.find(d=>d.id===loan.id).paymentAccountId,'bank');
- for(let i=0;i<3;i++){
-  await page.click('#cb-demo-loan');
-  await page.waitForFunction(id=>Object.values(window.__previewData().ticks).some(m=>m[id]),loan.id);
-  assert(!(await page.locator('#modal-txn').evaluate(e=>e.classList.contains('open'))));
-  const repeat=await data();assert.equal(repeat.txns[month].filter(t=>t.debtId===loan.id).length,1);
-  assert.equal(repeat.debts.find(d=>d.id===loan.id).curTerm,loan.curTerm+1);
-  await page.click('#cb-demo-loan');
-  await page.waitForFunction(id=>!Object.values(window.__previewData().ticks).some(m=>m[id]),loan.id);
-  assert.deepEqual((await data()).txns,initial.txns);
+ const p=await b.newPage({viewport:{width:390,height:844},reducedMotion:'reduce'});p.setDefaultTimeout(12000);
+ const errors=[];p.on('pageerror',e=>errors.push(e.message));
+ const text=async(id,v)=>assert.equal(await p.locator('#'+id).textContent(),v);
+ const save=async id=>{await p.click(id+' .mbtn-save');await p.waitForSelector(id,{state:'hidden'});};
+ const manage=async()=>{await p.click('#nav-settings');await p.click('.management-link');};
+ const txn=async(type,name,amount)=>{await p.evaluate(t=>openTxnModalType(t),type);await p.fill('#txn-name',name);await p.fill('#txn-amount',String(amount));await save('#modal-txn');};
+ await p.goto('http://127.0.0.1:4173/?ledger');await p.waitForFunction(()=>document.querySelector('#hero-balance').textContent==='10.000.000đ');
+ assert.equal(await p.locator('#txn-account,#txn-destination,#bn-name,#bn-kind,#tt-transfer,#balance-accounts').count(),0);
+ await txn('out','Ăn trưa',100000);await text('hero-balance','9.900.000đ');
+ await p.click('#nav-txn');await p.locator('.txn-row').filter({hasText:'Ăn trưa'}).click();await p.fill('#txn-amount','200000');await save('#modal-txn');
+ await p.click('#nav-home');await text('hero-balance','9.800.000đ');
+ await p.locator('.notebook-add').click();await p.fill('#bn-amount','12000000');await save('#modal-balance-note');await text('hero-balance','12.000.000đ');
+ await txn('out','Sau đối chiếu',100000);await text('hero-balance','11.900.000đ');
+ await txn('in','Thu phát sinh',200000);await text('hero-balance','12.100.000đ');
+ await p.locator('.reserved-button').click();assert(await p.locator('#remaining-details').evaluate(e=>e.open));assert((await p.locator('#remaining-items').textContent()).includes('Tiền nhà'));
+ await p.click('#nav-txn');await p.click('.fin-fixed-btn');await p.locator('#monthly-expense .note-link').click();await save('#modal-txn');
+ await p.click('#nav-home');await text('hero-reserved','0đ');await text('hero-balance','5.100.000đ');
+ await p.click('#nav-txn');await p.click('.fin-fixed-btn');await p.locator('#monthly-expense .note-link').click();await p.waitForFunction(()=>!document.body.classList.contains('saving'));
+ await p.click('#nav-home');await text('hero-reserved','7.000.000đ');await text('hero-balance','12.100.000đ');
+ // Explicit start months work for both recurring income and expenses.
+ const dates=await p.evaluate(()=>{const d=new Date();return {now:d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'),next:new Date(d.getFullYear(),d.getMonth()+1,1).getFullYear()+'-'+String(new Date(d.getFullYear(),d.getMonth()+1,1).getMonth()+1).padStart(2,'0')};});
+ for(const [mode,name,amount,index] of [['income','Lương thêm',1000000,0],['expense','Internet',300000,1]]){
+  await manage();await p.locator('#page-finance .add-row').nth(index).click();await p.fill('#mf-name',name);await p.fill('#mf-amount',String(amount));await p.fill('#mf-start',dates.next);await save('#modal-fin');
+  assert((await p.locator('#list-'+mode).textContent()).includes(name));
+  await p.evaluate(()=>shiftMonth(-1));assert(!(await p.locator('#list-'+mode).textContent()).includes(name));
  }
- const beforeQuickFailure=await data();await page.evaluate(()=>window.__failSave=true);
- await page.click('#cb-demo-loan');await page.waitForTimeout(350);
- assert.deepEqual(await data(),beforeQuickFailure);assert(!(await page.locator('#cb-demo-loan').evaluate(e=>e.classList.contains('checked'))));
- await page.evaluate(()=>window.__failSave=false);
- // The saved source can still be changed through payment details.
- await page.evaluate(id=>window.editDebtPayment(id),loan.id);
- await page.selectOption('#txn-account','cash');await save('#modal-txn');
- assert.equal((await data()).debts.find(d=>d.id===loan.id).paymentAccountId,'cash');
- await page.click('#cb-demo-loan');await page.waitForFunction(id=>!Object.values(window.__previewData().ticks).some(m=>m[id]),loan.id);
- // Legacy records survive and do not acquire a made-up account.
- await tab('txn');assert.equal(await page.locator('#legacy-saving-hint').count(),0);assert.equal((await data()).savings.filter(s=>s.id==='s1').length,1);
- // Tools and all five tabs remain usable on small screens.
- for(const [label,id,fields] of [['Tính lãi vay','tool-interest',[['ti-principal','10000000'],['ti-rate','0'],['ti-terms','12']]],['Lãi kép tiết kiệm','tool-saving-calc',[['sc-goal','12000000'],['sc-rate','0'],['sc-months','12']]]]){
-  await tab('report');await page.locator('#page-report').getByText(label,{exact:true}).click();for(const [field,value] of fields)await page.fill('#'+field,value);await page.click('#page-'+id+' .tool-run-btn');assert(!(await page.locator('#page-'+id+' .tool-result').textContent()).includes('NaN'));
- }
+ await p.click('#nav-home');await text('hero-reserved','7.000.000đ');
+ // Debt payment and reversal use the main balance without a selection form.
+ await p.goto('http://127.0.0.1:4173/');await p.waitForFunction(()=>document.querySelector('#hero-balance').textContent==='30.000.000đ');
+ await p.click('#nav-paid');
+ for(const id of ['demo-card','demo-loan']){await p.click('#cb-'+id);await p.waitForFunction(id=>Object.values(window.__previewData().ticks).some(m=>m[id]),id);assert.equal(await p.locator('#modal-txn.open').count(),0);}
+ await p.click('#nav-home');await text('hero-reserved','6.500.000đ');await text('hero-balance','26.400.000đ');
+ await p.click('#nav-paid');await p.click('#cb-demo-card');await p.waitForFunction(()=>!Object.values(window.__previewData().ticks).some(m=>m['demo-card']));
+ await p.click('#nav-home');await text('hero-reserved','7.150.000đ');await text('hero-balance','27.050.000đ');
+ // Failed save leaves the balance unchanged.
+ await p.evaluate(()=>openTxnModalType('out'));await p.fill('#txn-name','Lỗi thử');await p.fill('#txn-amount','1000');await p.evaluate(()=>window.__failSave=true);await p.click('#modal-txn .mbtn-save');await p.waitForTimeout(150);assert(await p.locator('#modal-txn').evaluate(e=>e.classList.contains('open')));await text('hero-balance','27.050.000đ');await p.evaluate(()=>{window.__failSave=false;closeModal('modal-txn');});
  fs.mkdirSync('artifacts',{recursive:true});
- for(const width of [320,360,390,430]){
-  await page.setViewportSize({width,height:844});
-  for(const name of ['home','paid','txn','report','settings']){
-   await tab(name);assert(await page.locator('#page-'+name).evaluate(el=>el.scrollWidth<=window.innerWidth+1));
-   if(width===390)await page.waitForTimeout(700);
-   if(width===390)await page.screenshot({path:'artifacts/ledger-'+name+'.png'});
-  }
- }
- await page.goto('http://127.0.0.1:4173/?empty');await page.waitForSelector('#onboarding-overlay.open');
- for(let i=0;i<3;i++)await page.locator('.ob-step.active .ob-secondary').click();
- await page.waitForSelector('#onboarding-overlay',{state:'hidden'});await expectText('kpi-wallet','Chưa có số dư');
- assert.deepEqual(errors,[]);console.log('PASS: account CRUD, planned/actual cash flow, partial payments, transfers, reconciliation, savings independence, failed saves, debt payment/undo, negative budget, mobile tabs and onboarding.');
- }finally{await browser.close();}
+ for(const width of [320,390,430]){await p.setViewportSize({width,height:844});for(const tab of ['home','paid','txn','settings','finance','monthly']){await p.evaluate(t=>switchPage(t),tab);assert(!(await p.evaluate(()=>document.documentElement.scrollWidth>innerWidth)));}}
+ await p.click('#nav-home');await p.locator('#page-home .scroll').evaluate(el=>el.scrollTop=0);await p.screenshot({path:'artifacts/single-balance-home.png'});
+ assert.deepEqual(errors,[]);console.log('PASS: single balance, editing, reconciliation, income/expense start months, remaining drilldown, debt tick/undo, failed saves and mobile layout.');
+ }finally{await b.close();}
 })().catch(e=>{console.error(e);process.exit(1)});

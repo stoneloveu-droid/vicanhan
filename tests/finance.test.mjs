@@ -1,7 +1,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {dueDate,plansForMonth,changePlan,monthSummary as summarize,mergeState,escapeHTML,localDate,balanceSummary,balanceEntries} from '../finance.js';
+import {dueDate,plansForMonth,changePlan,monthSummary as summarize,mergeState,escapeHTML,localDate,accountBalances as balanceSummary,balanceEntries} from '../finance.js';
 import {normalizeData} from '../data-schema.js';
 import {isDebtActive} from '../finance.js';
 const monthSummary=state=>summarize(normalizeData(state));
@@ -53,7 +53,7 @@ test('account ledger carries balances across months and transfers preserve total
  const notes=[{id:'cash',name:'Cash',kind:'cash',amount:200,date:'2026-08-01',includedTxnIds:[]},{id:'bank',name:'Bank',kind:'bank',amount:800,date:'2026-08-01',includedTxnIds:[]}];
  const txns={'2026-08':[{id:'a',date:'2026-08-02',type:'out',accountId:'cash',amount:50}],'2026-09':[{id:'b',date:'2026-09-02',type:'in',accountId:'bank',amount:100},{id:'c',date:'2026-09-03',type:'transfer',accountId:'bank',toAccountId:'cash',amount:200}]};
  const s=monthSummary({balanceNotes:notes,txns,currentMonth:'2026-09',today:'2026-09-20'});
- assert.equal(s.balanceTotal,1050);assert.equal(s.accounts[0].amount,350);assert.equal(s.accounts[1].amount,700);assert.equal(s.totalIn,100);assert.equal(s.totalOut,0);
+ assert.equal(s.balanceTotal,1050);assert.equal(s.accounts.length,1);assert.equal(s.accounts[0].amount,1050);assert.equal(s.totalIn,100);assert.equal(s.totalOut,0);
  assert.equal(monthSummary({balanceNotes:notes,txns,currentMonth:'2026-08',today:'2026-09-20'}).balanceTotal,950);
 });
 test('paying a plan once releases its reserve; unreceived income is not spendable',()=>{
@@ -194,4 +194,25 @@ test('stopping and resuming a debt preserves past forecasts and paid history',()
  const paid=monthSummary({...state,currentMonth:'2026-09'});assert.equal(paid.reserved,0);assert.equal(paid.totalOut,100);
  assert.equal(monthSummary({...state,currentMonth:'2026-10'}).reserved,0);
  assert.equal(monthSummary({...state,currentMonth:'2026-11'}).reserved,100);
+});
+
+test('main balance preserves combined history and reconciles only once',async()=>{
+ const {balanceSummary:main}=await import('../finance.js');
+ const notes=[{id:'cash',name:'Cash',kind:'cash',amount:200,date:'2026-08-01',includedTxnIds:[]},{id:'bank',name:'Bank',kind:'bank',amount:800,date:'2026-08-01',includedTxnIds:[]}];
+ const txns={'2026-08':[{id:'a',type:'out',accountId:'cash',amount:50,date:'2026-08-02'}],'2026-09':[{id:'b',type:'in',accountId:'main',amount:100,date:'2026-09-01'}]};
+ assert.equal(main(notes,0,txns,'2026-08-31').total,950);
+ assert.equal(main(notes,0,txns,'2026-09-01').total,1050);
+ notes.push({id:'check',accountId:'main',amount:1500,date:'2026-09-02',includedTxnIds:['a','b']});
+ txns['2026-09'].push({id:'c',type:'out',accountId:'main',amount:50,date:'2026-09-02'});
+ assert.equal(main(notes,0,txns,'2026-09-02').total,1450);
+ assert.equal(main(notes,0,txns,'2026-08-31').total,950);
+ assert.equal(main([],0,{'2026-09':[{id:'x',type:'out',accountId:'main',amount:100,date:'2026-09-01'}]},'2026-09-02').total,-100);
+});
+test('explicit recurring start month leaves preceding months unchanged',()=>{
+ let state={income:[],expense:[],recurringPlans:{},monthlyPlans:{}};
+ for(const mode of ['income','expense'])state={...state,...changePlan(state,'2026-11',mode,{id:mode,name:mode,amount:100,startMonth:'2026-11'},'recurring')};
+ assert.equal(plansForMonth(state,'2026-10').income.length,0);
+ assert.equal(plansForMonth(state,'2026-10').expense.length,0);
+ assert.equal(plansForMonth(state,'2026-11').income[0].startMonth,'2026-11');
+ assert.equal(plansForMonth(state,'2027-01').expense[0].amount,100);
 });

@@ -4,7 +4,7 @@
 
 ## Quản lý và sử dụng
 
-- **Cài đặt → Danh mục tài chính:** danh sách thu cố định, chi cố định, thẻ tín dụng và khoản vay. Thêm, sửa và dừng áp dụng tại đây.
+- **Cài đặt → Danh mục tài chính:** danh sách thu cố định, chi cố định, thẻ tín dụng và khoản vay. Thêm, sửa và dừng áp dụng tại đây. Khoản thu/chi có trường tháng bắt đầu; chỉ tính kế hoạch từ tháng đó.
 - **Nợ:** xem chi tiết, đánh dấu đã trả hoặc hoàn tác. Không có thao tác xóa khoản nợ.
 - **Thu chi → Thu chi cố định:** nhận tiền, thanh toán hoặc hoàn tác giao dịch kế hoạch gần nhất. Thu chi phát sinh được ghi riêng.
 - **Ngừng theo dõi khoản nợ:** lưu mốc hiệu lực theo tháng, giữ thông tin khoản nợ và toàn bộ lịch sử. Có thể theo dõi lại trong Cài đặt.
@@ -12,12 +12,13 @@
 
 ## Cách tính
 
-- Tiền hiện có là số dư đối chiếu từng tài khoản cộng/trừ giao dịch phát sinh sau mốc đó.
+- Card chính là số dư duy nhất. Thu, chi và trả nợ tự động dùng số dư này; không tạo hoặc chọn tài khoản phụ. Số dư và lịch sử từ các nguồn đã nhập vẫn được giữ khi tính tổng.
+- Cập nhật số dư và xem lịch sử ngay trên card chính. Khoản thu/chi tiếp theo được cộng hoặc trừ từ mốc đối chiếu.
 - Còn phải chi gồm nợ chưa trả và khoản chi dự kiến chưa thanh toán. Trả hết nợ không loại bỏ tiền nhà hoặc các chi phí còn chờ.
 - Ước tính có thể chi = tiền hiện có − còn phải chi. Thu nhập chưa nhận chưa được cộng.
 - Khoản chi liên kết với nợ chỉ được dự tính một lần. Khi đọc dữ liệu, chỉ tự liên kết bản ghi trùng có mã phù hợp hoặc tên và số tiền khớp duy nhất; các trường hợp khác được liên kết trong Cài đặt.
-- Card chính hiển thị phần nợ và chi khác còn lại; mở danh sách để xem từng khoản.
-- Chuyển tiền chỉ đổi nơi giữ tiền. Tiết kiệm là ghi chú riêng.
+- Nhấn trực tiếp vào “Còn phải chi” trên card chính để xem từng khoản nợ và chi dự kiến chưa thanh toán.
+- Tiết kiệm là ghi chú riêng. Lịch sử chuyển tiền nội bộ vẫn được giữ; không tạo chuyển tiền mới.
 - Thanh toán nợ ghi chi, cập nhật tài khoản và kỳ vay cùng một lần; hoàn tác khôi phục các thay đổi đó.
 
 ## Dữ liệu và đồng bộ

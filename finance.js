@@ -21,7 +21,7 @@ export function accountEntries(balanceNotes,walletBase=0){
     return {...note,accountId};
   });
 }
-export function balanceSummary(balanceNotes,walletBase=0,txns={},asOf=localDate()){
+export function accountBalances(balanceNotes,walletBase=0,txns={},asOf=localDate()){
   const latest=new Map();
   for(const note of accountEntries(balanceNotes,walletBase)){
     if(note.date&&note.date>asOf)continue;
@@ -162,4 +162,23 @@ export function mergeState(base, local, remote, path='') {
     return result;
   }
   throw new Error('Dữ liệu vừa thay đổi trên thiết bị khác. Đã tải bản mới; vui lòng thực hiện lại.');
+}
+
+export function balanceSummary(notes,walletBase=0,txns={},asOf=localDate()){
+ const entries=Object.values(txns).flat();
+ const snapshots=accountEntries(notes).filter(n=>n.accountId==='main'&&(!n.date||n.date<=asOf));
+ const latest=snapshots.sort((a,b)=>(a.date||'').localeCompare(b.date||'')).at(-1);
+ let total;
+ if(latest){
+  total=Number(latest.amount)||0;
+  for(const t of entries){
+   if(!t.accountId||t.type==='transfer'||!t.date||t.date>asOf||t.date<(latest.date||''))continue;
+   if(t.date===latest.date&&(!Array.isArray(latest.includedTxnIds)||latest.includedTxnIds.includes(t.id)))continue;
+   total+=(t.type==='in'?1:-1)*(Number(t.amount)||0);
+  }
+ }else{
+  total=accountBalances(notes,walletBase,txns,asOf).total;
+  total+=entries.filter(t=>t.accountId==='main'&&t.type!=='transfer'&&t.date&&t.date<=asOf).reduce((n,t)=>n+(t.type==='in'?1:-1)*Number(t.amount||0),0);
+ }
+ return {total,cash:total,bank:0,accounts:[{id:latest?.id||'main',accountId:'main',name:'Số dư',kind:'other',amount:total,date:latest?.date||''}]};
 }

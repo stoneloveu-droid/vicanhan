@@ -133,7 +133,6 @@ export function renderHome(state){
   const track=document.getElementById('budget-progress');
   if(track){track.hidden=walletHidden;track.setAttribute('aria-valuenow',String(progress));}
   const fill=document.getElementById('budget-progress-fill');if(fill)fill.style.width=progress+'%';
-  const noticeBox=document.getElementById('dashboard-notice');if(noticeBox)noticeBox.hidden=!summary.unassigned;
 
   set('kpi-wallet',walletHidden?'••••••':summary.accounts.length?fmt(summary.available):'Chưa có số dư');
   set('available-amount',walletHidden?'••••••':fmt(summary.reserved));
@@ -152,10 +151,8 @@ export function renderHome(state){
     if(!rows.length)remainingList.textContent='Đã thanh toán đủ các khoản dự chi.';
   }
   set('hero-reserved',walletHidden?'••••••':fmt(summary.reserved));
-  set('wallet-status',!summary.accounts.length?'Thêm số dư tài khoản để bắt đầu.':summary.available<0?'Thiếu tiền theo các khoản chưa thanh toán đã nhập.':summary.available===0?'Số dư hiện đủ cho các khoản chưa thanh toán.':'Theo số dư và các khoản chưa thanh toán bạn đã nhập.');
+  set('wallet-status',!summary.accounts.length?'Cập nhật số dư để bắt đầu.':summary.available<0?'Thiếu tiền theo các khoản chưa thanh toán đã nhập.':summary.available===0?'Số dư hiện đủ cho các khoản chưa thanh toán.':'Theo số dư và các khoản chưa thanh toán bạn đã nhập.');
   document.getElementById('kpi-wallet').style.color=summary.available<0?'var(--red)':'';
-  const notice=document.getElementById('unassigned-notice');
-  if(notice){notice.hidden=!summary.unassigned;notice.textContent=summary.unassigned+' giao dịch chưa chọn tài khoản. Mở Thu chi để bổ sung.';}
   set('hero-breakdown',walletHidden?'Xem các khoản còn phải chi':'Chưa trả: Nợ '+fmt(summary.unpaidDebt)+' · Chi khác '+fmt(summary.remainingExpense));
   set('home-saving-notes',walletHidden?'••••••':fmt(summary.savingTotal));
   set('home-debt-left',walletHidden?'••••••':fmt(summary.debtLeft));set('home-unpaid',walletHidden?'••••••':fmt(summary.unpaidDebt));
@@ -251,7 +248,7 @@ export function renderTxnPage(state){
   const summary=monthSummary(state);
   const monthTxns=summary.entries;
   const {txnIn,txnOut,net:txnRemain,accounts}=summary;
-  const accountName=id=>accounts.find(a=>a.accountId===id)?.name||'Chưa chọn tài khoản';
+  const accountName=id=>'Số dư chung';
   if(el('txn-kpi-in'))  el('txn-kpi-in').textContent=fmt(txnIn);
   if(el('txn-kpi-out')) el('txn-kpi-out').textContent=fmt(txnOut);
   if(el('txn-kpi-remain')){
@@ -357,7 +354,7 @@ function renderFinList(mode,items,entries=[],state){
    const remaining=planRemaining(it,entries,mode==='income'?'in':'out');
    const row=document.createElement('div');row.className='srow';
    const info=document.createElement('div');info.className='s-info';
-   info.innerHTML='<div class="s-name">'+escapeHTML(it.name)+'</div><small class="fin-frequency">'+(it.debtId?'Theo khoản nợ liên kết':isRecurringPlan({recurringPlans:{[state.currentMonth]:state.recurring}},mode,it,state.currentMonth)?'Hằng tháng':'Riêng tháng này')+'</small><div class="s-val">'+fmt(amount)+(editing?'':' · Còn '+fmt(remaining))+'</div>';
+   info.innerHTML='<div class="s-name">'+escapeHTML(it.name)+'</div><small class="fin-frequency">'+(it.debtId?'Theo khoản nợ liên kết':isRecurringPlan({recurringPlans:{[state.currentMonth]:state.recurring}},mode,it,state.currentMonth)?'Hằng tháng'+(it.startMonth?' · Từ '+getML(it.startMonth):''):'Riêng tháng này')+'</small><div class="s-val">'+fmt(amount)+(editing?'':' · Còn '+fmt(remaining))+'</div>';
    const button=document.createElement('button');button.className='note-link';
    if(editing){info.onclick=()=>window.openFinEdit(mode,it.id);button.textContent='Sửa';button.onclick=()=>window.openFinEdit(mode,it.id);}
    else{button.textContent=remaining<=0?'✓ Hoàn tác':mode==='income'?'Nhận tiền':'Thanh toán';button.setAttribute('aria-label',button.textContent+' '+it.name);button.onclick=()=>window.openPlanPayment(mode,it.id);}

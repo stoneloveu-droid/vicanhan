@@ -6,12 +6,12 @@ export function renderBalanceBook(notes,walletBase,hidden=false,txns={},asOf,com
   const summary=balanceSummary(notes,walletBase,txns,asOf);
   for(const [id,items] of [['balance-accounts',computedAccounts||summary.accounts],['balance-history',balanceEntries(notes,walletBase).slice().sort((a,b)=>(b.date||'').localeCompare(a.date||''))]]){
     const list=document.getElementById(id);if(!list)continue;list.replaceChildren();
-    if(!items.length){const empty=document.createElement('p');empty.className='notebook-hint';empty.textContent='Thêm số dư tiền mặt hoặc tài khoản ngân hàng để bắt đầu.';list.appendChild(empty);continue;}
+    if(!items.length){const empty=document.createElement('p');empty.className='notebook-hint';empty.textContent='Chưa có lần cập nhật số dư.';list.appendChild(empty);continue;}
     for(const entry of items){
       const row=document.createElement('button');row.className='balance-note-row';row.type='button';row.onclick=()=>id==='balance-accounts'?window.reconcileAccount(entry.accountId):window.openBalanceNote(entry.id);
       const info=document.createElement('span'),name=document.createElement('b'),detail=document.createElement('small'),amount=document.createElement('strong');
       name.textContent=entry.name;
-      detail.textContent=(entry.kind==='bank'?'Ngân hàng':entry.kind==='cash'?'Tiền mặt':'Khác')+' · '+(entry.date?'Đối chiếu ':'')+dateLabel(entry.date);
+      detail.textContent=(entry.date?'Đối chiếu ':'')+dateLabel(entry.date);
       amount.textContent=hidden?'••••••':fmt(entry.amount);
       info.append(name,detail);
       if(id==='balance-history'&&entry.note){const note=document.createElement('small');note.textContent=entry.note;info.appendChild(note);}

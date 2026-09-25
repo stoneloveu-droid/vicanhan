@@ -261,7 +261,7 @@ window.loginFromOnboarding=async function(){
 window.finishOnboarding=async function(){
   window._onboardingDone=true;
   const initialAmount=readOnboardingAmount('ob-wallet-amount');
-  if(initialAmount>0)balanceNotes=[{id:'bn-'+crypto.randomUUID(),name:'Số dư ban đầu',kind:'other',amount:initialAmount,date:localDate(),note:''}];
+  if(initialAmount>0)balanceNotes=[{id:'bn-'+crypto.randomUUID(),name:'Số dư',accountId:'main',kind:'other',amount:initialAmount,date:localDate(),note:''}];
   monthlyPlans[currentMonth]={income:clone(income),expense:clone(expense)};
   await saveToFirestore();
   document.getElementById('onboarding-overlay')?.classList.remove('open');
@@ -411,7 +411,7 @@ window.tapCheck=async function(id){
   if(d.settled||!isDebtActive(d,currentMonth))return;
   const accounts=balanceSummary(balanceNotes,walletBase,txns).accounts;
   const previous=Object.values(txns).flat().filter(t=>t.debtId===id).sort((a,b)=>(b.date||'').localeCompare(a.date||''))[0];
-  const preferred=d.paymentAccountId||previous?.accountId;
+  const preferred='main';
   const account=accounts.find(a=>a.accountId===preferred)||(!preferred&&accounts.length===1?accounts[0]:null);
   if(account){
     const amount=paymentAmount(d);
@@ -431,10 +431,9 @@ window.editDebtPayment=function(id){
   if(currentMonth!==localDate().slice(0,7)){showToast('Chọn tháng hiện tại để xác nhận thanh toán.');return;}
   const old=ticks[currentMonth]?.[id];
   if(old?.txnId){openTxnEdit(old.txnId);return;}
-  if(old){showToast('Hoàn tác thanh toán cũ trước khi chọn tài khoản.');return;}
+  if(old){showToast('Hoàn tác trước khi ghi lại thanh toán.');return;}
   if(d.settled)return;
   window.openTxnModalType('out');pendingDebtId=id;document.getElementById('txn-modal-title').textContent='Thanh toán nợ';refreshTxnPlans();
-  refreshTxnAccounts(d.paymentAccountId);
   document.getElementById('txn-name').value='Trả nợ: '+d.name;
   setInputFmt('txn-amount',paymentAmount(d));
 };
@@ -453,16 +452,10 @@ function fillSelect(id,items,placeholder,value=''){
   for(const item of items)el.add(new Option(item.name,item.id));
   el.value=value;
 }
-function refreshTxnAccounts(value='',destination=''){
-  const accounts=balanceSummary(balanceNotes,walletBase,txns).accounts.map(x=>({id:x.accountId,name:x.name+' · '+fmt(x.amount)}));
-  fillSelect('txn-account',accounts,'Chọn ví / tài khoản',value||(!editTxnId&&accounts.length===1?accounts[0].id:''));
-  fillSelect('txn-destination',accounts,'Chọn tài khoản nhận',destination);
-}
 function refreshTxnPlans(value=''){
   const plans=getState()[txnType==='in'?'income':'expense'].filter(p=>!p.debtId||!debts.some(d=>d.id===p.debtId));
   fillSelect('txn-plan',plans,'Ngoài kế hoạch',value);
   document.getElementById('txn-plan-field').hidden=txnType==='transfer'||!!pendingDebtId;
-  document.getElementById('txn-destination-field').hidden=txnType!=='transfer';
 }
 window.openPlanPayment=async function(mode,id){
   const plan=getState()[mode].find(p=>p.id===id);if(!plan)return;
@@ -500,7 +493,6 @@ function undoDebtPayment(id){
 window.openTxnModal=function(){
   editTxnId=null;
   pendingDebtId=null;
-  refreshTxnAccounts();
   document.getElementById('txn-name').value='';
   const ta=document.getElementById('txn-amount');ta.value='';ta.dataset.raw='';
   document.getElementById('txn-del').style.display='none';
@@ -521,6 +513,7 @@ window.openTxnModal=function(){
 };
 function openTxnEdit(id){
   const t=(txns[currentMonth]||[]).find(x=>x.id===id);if(!t)return;
+  if(t.type==='transfer'){showToast('Chuyển nội bộ không làm thay đổi tổng số dư.');return;}
   editTxnId=id;
   document.getElementById('txn-name').value=t.name;
   setInputFmt('txn-amount',t.amount);
@@ -535,7 +528,6 @@ function openTxnEdit(id){
   }
   pendingDebtId=t.debtId||null;
   setTxnType(t.type);
-  refreshTxnAccounts(t.accountId,t.toAccountId);
   refreshTxnPlans(t.planId);
   document.getElementById('modal-txn').classList.add('open');
 }
@@ -543,15 +535,14 @@ function openTxnEdit(id){
 window._openTxnEdit=openTxnEdit;
 
 window.setTxnType=function(t){
+  if(t==='transfer'){showToast('Sổ sử dụng một số dư duy nhất.');return;}
   txnType=t;
   document.getElementById('txn-modal-title').textContent=(editTxnId?'Sửa ':'')+(pendingDebtId?'Thanh toán nợ':t==='in'?'Ghi thu':t==='out'?'Ghi chi':'Chuyển tiền');
-  document.getElementById('txn-account-label').textContent=t==='in'?'Nhận vào':t==='out'?'Chi từ':'Chuyển từ';
   document.getElementById('txn-name').placeholder=t==='in'?'Ví dụ: Lương tháng này':t==='out'?'Ví dụ: Ăn trưa':'Ví dụ: Rút tiền mặt';
   document.getElementById('txn-chips').hidden=t==='transfer';
   if(t==='transfer'&&!document.getElementById('txn-name').value)document.getElementById('txn-name').value='Chuyển tiền';
   document.getElementById('tt-in') .className='tt-btn'+(t==='in'?' active-in':'');
   document.getElementById('tt-out').className='tt-btn'+(t==='out'?' active-out':'');
-  document.getElementById("tt-transfer").className="tt-btn"+(t==="transfer"?" active-in":"");
   refreshTxnPlans();
   renderChips();
 };
@@ -572,13 +563,11 @@ function renderChips(){
 window.saveTxn=async function(){
   const name=document.getElementById('txn-name').value.trim();
   const amount=getInputVal('txn-amount'),txnDate=document.getElementById('txn-date').value;
-  const accountId=document.getElementById('txn-account').value,toAccountId=document.getElementById('txn-destination').value;
+  const accountId=editTxnId?(txns[currentMonth]||[]).find(t=>t.id===editTxnId)?.accountId||'main':'main',toAccountId='';
   const planId=txnType==='transfer'||pendingDebtId?'':document.getElementById('txn-plan').value;
   if(!name||!Number.isFinite(amount)||amount<=0){showToast('Nhập tên và số tiền hợp lệ.');return;}
   if(!validNoteDate(txnDate)||!txnDate.startsWith(currentMonth)||txnDate>localDate()){showToast('Chọn ngày đã phát sinh trong tháng đang xem.');return;}
-  const accounts=balanceSummary(balanceNotes,walletBase,txns,txnDate).accounts;
-  if(!accounts.some(a=>a.accountId===accountId)){showToast('Thêm số dư tài khoản trước ngày giao dịch rồi chọn tài khoản.');return;}
-  if(txnType==='transfer'&&(!accounts.some(a=>a.accountId===toAccountId)||accountId===toAccountId)){showToast('Chọn hai tài khoản khác nhau.');return;}
+
   const initialEntries=Object.values(txns).flat();
   if(pendingDebtId&&txnType!=='out'){showToast('Thanh toán nợ phải là khoản chi.');return;}
   const list=txns[currentMonth]||(txns[currentMonth]=[]);
@@ -640,19 +629,10 @@ window.openBalanceBook=function(){
   renderBalanceBook(balanceNotes,walletBase,false,txns);
   document.getElementById('modal-wallet').classList.add('open');
 };
-let reconcileAccountId=null;
-window.reconcileAccount=function(id){
- const account=balanceSummary(balanceNotes,walletBase,txns).accounts.find(a=>a.accountId===id);if(!account)return;
- window.openBalanceNote();reconcileAccountId=id;
- document.getElementById('bn-name').value=account.name;document.getElementById('bn-kind').value=account.kind;setInputFmt('bn-amount',account.amount);
-};
 window.openBalanceNote=function(id){
-  reconcileAccountId=null;
   editBalanceId=id||null;
   const item=balanceEntries(balanceNotes,walletBase).find(x=>x.id===id);
-  document.getElementById('bn-name').value=item?.name||'';
-  document.getElementById('bn-kind').value=item?.kind||'cash';
-  setInputFmt('bn-amount',item?.amount??0);
+  setInputFmt('bn-amount',item?.amount??balanceSummary(balanceNotes,walletBase,txns).total);
   document.getElementById('bn-date').value=item?.date||localDate();
   document.getElementById('bn-note').value=item?.note||'';
   document.getElementById('bn-del').style.display=item?'block':'none';
@@ -660,16 +640,15 @@ window.openBalanceNote=function(id){
   document.getElementById('modal-balance-note').classList.add('open');
 };
 window.saveBalanceNote=async function(){
-  const name=document.getElementById('bn-name').value.trim();
+  const name='Số dư';
   const amount=getInputVal('bn-amount'),date=document.getElementById('bn-date').value;
-  const kind=document.getElementById('bn-kind').value,note=document.getElementById('bn-note').value.trim();
+  const kind='other',note=document.getElementById('bn-note').value.trim();
   if(!name||!validNoteDate(date)||!Number.isFinite(amount)||amount<0){showToast('Nhập tên, số tiền và ngày ghi hợp lệ.');return;}
   if(date>localDate()){showToast('Ngày cập nhật không được ở tương lai.');return;}
   const entries=clone(accountEntries(balanceNotes,walletBase));
   const item=entries.find(x=>x.id===editBalanceId);
   const id=item?.id||'bn-'+crypto.randomUUID();
-  const matching=entries.find(x=>x.kind===kind&&x.name.trim().toLocaleLowerCase('vi-VN')===name.toLocaleLowerCase('vi-VN'));
-  const accountId=item?.accountId||reconcileAccountId||matching?.accountId||id;
+  const accountId=item?.accountId||'main';
   const includedTxnIds=item&&item.date===date?item.includedTxnIds:Object.values(txns).flat().filter(t=>t.date<=date).map(t=>t.id);
   const update={name,kind,amount,date,note,accountId};
   if(includedTxnIds)update.includedTxnIds=includedTxnIds;
@@ -682,9 +661,7 @@ window.deleteBalanceNote=function(){
   confirmAction('Xóa bản cập nhật này? Số dư sẽ hiển thị theo bản cập nhật gần nhất còn lại.',async()=>{
     const notes=accountEntries(balanceNotes,walletBase),item=notes.find(x=>x.id===editBalanceId);
     const remaining=notes.filter(x=>x.id!==editBalanceId);
-    if(item&&!remaining.some(x=>x.accountId===item.accountId)&&Object.values(txns).flat().some(t=>t.accountId===item.accountId||t.toAccountId===item.accountId)){
-      showToast('Tài khoản còn giao dịch. Hãy chuyển hoặc xóa các giao dịch trước.');return;
-    }
+
     balanceNotes=remaining;
     await saveToFirestore();window.closeModal('modal-balance-note');renderAll();showToast('Đã xóa bản cập nhật');
   });
@@ -912,6 +889,7 @@ window.deleteDebt=function(){
 // ── FINANCE MODAL ─────────────────────────────────────────────
 function setupFinOptions(item){
   const state={income,expense,recurringPlans,monthlyPlans};
+  document.getElementById('mf-start').value=currentMonth;
   document.getElementById('mf-repeat').value=!item||isRecurringPlan(state,finMode,item,currentMonth)?'recurring':'month';
   fillSelect('mf-debt',debts.filter(d=>!d.settled||ticks[currentMonth]?.[d.id]).map(d=>({id:d.id,name:d.name})),'Không liên kết khoản nợ',item?.debtId||'');
   document.getElementById('mf-debt-field').hidden=finMode!=='expense';
@@ -950,19 +928,21 @@ window.saveFin=async function(){
   const name=document.getElementById('mf-name').value.trim(),amount=getInputVal('mf-amount'),note=document.getElementById('mf-note').value.trim();
   const scope=document.getElementById('mf-repeat').value,debtId=finMode==='expense'?document.getElementById('mf-debt').value:'';
   if(!name||!Number.isFinite(amount)||amount<=0){showToast('Nhập tên và số tiền hợp lệ.');return;}
-  const item={id:editFinId||'f-'+crypto.randomUUID(),name,amount,note,debtId};
+  const startMonth=document.getElementById('mf-start').value;
+  if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(startMonth)){showToast('Chọn tháng bắt đầu hợp lệ.');return;}
+  const item={id:editFinId||'f-'+crypto.randomUUID(),name,amount,note,debtId,startMonth};
   const old=getState()[finMode].find(p=>p.id===editFinId);
-  if(debtId&&debtId!==old?.debtId&&(txns[currentMonth]||[]).some(t=>t.planId===item.id)){
+  if(debtId&&debtId!==old?.debtId&&(txns[startMonth]||[]).some(t=>t.planId===item.id)){
     showToast('Khoản này đã có giao dịch. Hãy gỡ liên kết kế hoạch trong giao dịch trước khi liên kết nợ.');return;
   }
-  ({monthlyPlans,recurringPlans}=changePlan({income,expense,monthlyPlans,recurringPlans},currentMonth,finMode,item,scope));
-  await saveToFirestore();window.closeModal('modal-fin');renderAll();showToast(scope==='recurring'?'Đã lưu khoản cố định hằng tháng':'Đã lưu cho tháng đang chọn');
+  ({monthlyPlans,recurringPlans}=changePlan({income,expense,monthlyPlans,recurringPlans},startMonth,finMode,item,scope));
+  await saveToFirestore();currentMonth=startMonth;syncMonthForPicker();window.closeModal('modal-fin');renderAll();showToast(scope==='recurring'?'Đã lưu khoản cố định hằng tháng':'Đã lưu cho tháng đang chọn');
 };
 window.deleteFin=function(){
   if(!editFinId)return;
   const scope=document.getElementById('mf-repeat').value;
   confirmAction(scope==='recurring'?'Dừng khoản cố định từ tháng đang chọn? Các tháng trước vẫn được giữ.':'Xóa khoản này khỏi tháng đang chọn?',async()=>{
-    ({monthlyPlans,recurringPlans}=changePlan({income,expense,monthlyPlans,recurringPlans},currentMonth,finMode,{id:editFinId},scope,true));
+    ({monthlyPlans,recurringPlans}=changePlan({income,expense,monthlyPlans,recurringPlans},document.getElementById('mf-start').value||currentMonth,finMode,{id:editFinId},scope,true));
     await saveToFirestore();window.closeModal('modal-fin');renderAll();showToast('Đã cập nhật');
   });
 };

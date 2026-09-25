@@ -1,5 +1,5 @@
 import { renderBalanceBook } from './notebook-ui.js';
-import { dueDate, isRecurringPlan, monthlyEntries, planRemaining, monthSummary, paymentAmount, escapeHTML, balanceEntries, recordedEntries, isLegacySavingEntry, localDate } from './finance.js';
+import { isDebtActive, dueDate, isRecurringPlan, monthlyEntries, planRemaining, monthSummary, paymentAmount, escapeHTML, balanceEntries, recordedEntries, localDate } from './finance.js';
 // ── render.js ─────────────────────────────────────────────────
 // Tất cả hàm render UI: home, paid, cards, txn, settings,
 // tools, report, charts
@@ -102,9 +102,6 @@ export function addCard2(wrap,d,ms,currentMonth){
   div.dataset.debtId=d.id;
   div.innerHTML=`
     <div class="dcard-top" onclick="tapTop('${d.id}')">
-      <div class="drag-handle" onclick="event.stopPropagation()" title="Kéo để sắp xếp">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="9" y1="5" x2="9" y2="19"/><line x1="15" y1="5" x2="15" y2="19"/></svg>
-      </div>
       <div class="bank-ico" style="background:${bg}">${abbr}</div>
       <div class="d-info">
         <div class="d-name">${escapeHTML(d.name)}${settled?'<span class="settled-tag">Tất toán</span>':''}</div>
@@ -136,7 +133,7 @@ export function renderHome(state){
   const track=document.getElementById('budget-progress');
   if(track){track.hidden=walletHidden;track.setAttribute('aria-valuenow',String(progress));}
   const fill=document.getElementById('budget-progress-fill');if(fill)fill.style.width=progress+'%';
-  const noticeBox=document.getElementById('dashboard-notice');if(noticeBox)noticeBox.hidden=!summary.unassigned&&!summary.legacyDebtCount;
+  const noticeBox=document.getElementById('dashboard-notice');if(noticeBox)noticeBox.hidden=!summary.unassigned;
 
   set('kpi-wallet',walletHidden?'••••••':summary.accounts.length?fmt(summary.available):'Chưa có số dư');
   set('available-amount',walletHidden?'••••••':fmt(summary.reserved));
@@ -144,11 +141,22 @@ export function renderHome(state){
   set('hero-planned',walletHidden?'••••••':fmt(summary.plannedExpense));
   set('hero-paid-planned',walletHidden?'••••••':fmt(summary.paidPlanned));
   set('hero-balance',walletHidden?'••••••':fmt(summary.balanceTotal));
+  const remainingList=document.getElementById('remaining-items');
+  if(remainingList){
+    remainingList.replaceChildren();
+    const rows=[
+      ...state.expense.filter(p=>!p.debtId).map(p=>({name:p.name,amount:planRemaining(p,summary.entries,'out'),page:'monthly'})),
+      ...state.debts.filter(d=>isDebtActive(d,currentMonth)&&!d.settled&&!state.ticks[currentMonth]?.[d.id]).map(d=>({name:d.name,amount:paymentAmount(d),page:'paid'}))
+    ].filter(x=>x.amount>0);
+    for(const item of rows){const b=document.createElement('button');b.className='remaining-row';b.onclick=()=>window.switchPage(item.page);const n=document.createElement('span'),a=document.createElement('strong');n.textContent=item.name;a.textContent=walletHidden?'••••••':fmt(item.amount);b.append(n,a);remainingList.appendChild(b);}
+    if(!rows.length)remainingList.textContent='Đã thanh toán đủ các khoản dự chi.';
+  }
   set('hero-reserved',walletHidden?'••••••':fmt(summary.reserved));
   set('wallet-status',!summary.accounts.length?'Thêm số dư tài khoản để bắt đầu.':summary.available<0?'Thiếu tiền theo các khoản chưa thanh toán đã nhập.':summary.available===0?'Số dư hiện đủ cho các khoản chưa thanh toán.':'Theo số dư và các khoản chưa thanh toán bạn đã nhập.');
   document.getElementById('kpi-wallet').style.color=summary.available<0?'var(--red)':'';
   const notice=document.getElementById('unassigned-notice');
-  if(notice){notice.hidden=!summary.unassigned&&!summary.legacyDebtCount;notice.textContent=[summary.unassigned?summary.unassigned+' giao dịch chưa chọn tài khoản. Mở Thu chi để bổ sung.':'',summary.legacyDebtCount?summary.legacyDebtCount+' khoản trả nợ cũ đã được tính vào Đã chi. Đối chiếu số dư tài khoản nếu cần.':''].filter(Boolean).join(' ');}
+  if(notice){notice.hidden=!summary.unassigned;notice.textContent=summary.unassigned+' giao dịch chưa chọn tài khoản. Mở Thu chi để bổ sung.';}
+  set('hero-breakdown',walletHidden?'Xem các khoản còn phải chi':'Chưa trả: Nợ '+fmt(summary.unpaidDebt)+' · Chi khác '+fmt(summary.remainingExpense));
   set('home-saving-notes',walletHidden?'••••••':fmt(summary.savingTotal));
   set('home-debt-left',walletHidden?'••••••':fmt(summary.debtLeft));set('home-unpaid',walletHidden?'••••••':fmt(summary.unpaidDebt));
   set('kpi-income-mini',walletHidden?'••••••':fmt(summary.totalIn));set('kpi-expense-mini',walletHidden?'••••••':fmt(summary.totalOut));
@@ -211,8 +219,8 @@ export function renderCards({debts, ticks, currentMonth, currentFilter}){
     list.innerHTML=`<div class="empty-card">
       <div class="empty-ico">🏦</div>
       <div class="empty-title">Chưa có khoản nợ nào</div>
-      <div class="empty-sub">Thêm thẻ tín dụng hoặc khoản vay để bắt đầu theo dõi</div>
-      <button onclick="openDebtTypeSheet()">+ Thêm khoản nợ</button>
+      <div class="empty-sub">Thêm thẻ tín dụng hoặc khoản vay trong Danh mục tài chính</div>
+      <button onclick="switchPage('settings')">Mở Cài đặt</button>
     </div>`;
     return;
   }
@@ -241,9 +249,7 @@ export function renderTxnPage(state){
   const el=id=>document.getElementById(id);
   if(el('txn-month-label')) el('txn-month-label').textContent=getML(currentMonth);
   const summary=monthSummary(state);
-  const monthTxns=[...summary.entries,...(txns[currentMonth]||[]).filter(isLegacySavingEntry)];
-  const legacyCount=monthTxns.filter(isLegacySavingEntry).length;
-  const hint=document.getElementById('legacy-saving-hint');if(hint){hint.hidden=!legacyCount;hint.textContent=legacyCount+' khoản được phân loại là tiết kiệm. Chọn giao dịch để thay đổi phân loại.';}
+  const monthTxns=summary.entries;
   const {txnIn,txnOut,net:txnRemain,accounts}=summary;
   const accountName=id=>accounts.find(a=>a.accountId===id)?.name||'Chưa chọn tài khoản';
   if(el('txn-kpi-in'))  el('txn-kpi-in').textContent=fmt(txnIn);
@@ -266,13 +272,13 @@ export function renderTxnPage(state){
       const show=[...(filteredTxns||monthTxns)].sort((a,b)=>(b.date||'').localeCompare(a.date||'')||b.id.localeCompare(a.id)).slice(0,showAllTxnsFlag?9999:8);
       show.forEach(t=>{
         const row=document.createElement('div');row.className='txn-row';
-        row.onclick=()=>t.legacyDebt?window.tapTop(t.debtId):window._openTxnEdit&&window._openTxnEdit(t.id);
+        row.onclick=()=>t.debtId?window.tapTop(t.debtId):window._openTxnEdit&&window._openTxnEdit(t.id);
         const ico=t.type==='transfer'?'⇄':txnCatIcon(t.name,t.type);
         const bg=t.type==='in'?'rgba(76,175,80,.12)':'rgba(255,79,79,.12)';
         row.innerHTML=`
           <div class="txn-cat-ico" style="background:${bg}">${ico}</div>
           <div class="txn-info">
-            <div class="txn-name">${escapeHTML(t.name)}</div><small class="legacy-entry">${t.legacyDebt?'Thanh toán từ bản cũ':escapeHTML(accountName(t.accountId))}${t.type==='transfer'?' → '+escapeHTML(accountName(t.toAccountId)):''}</small>${isLegacySavingEntry(t)?'<small class="legacy-entry">Tiết kiệm</small>':''}
+            <div class="txn-name">${escapeHTML(t.name)}</div><small class="txn-account-note">${escapeHTML(accountName(t.accountId))}${t.type==='transfer'?' → '+escapeHTML(accountName(t.toAccountId)):''}</small>
             ${t.date?`<div style="font-size:10px;color:var(--sub);font-weight:600">${new Date(t.date).toLocaleDateString('vi-VN',{day:'numeric',month:'numeric'})}</div>`:''}
           </div>
           <div class="txn-amount ${t.type}">${t.type==='transfer'?'':t.type==='in'?'+':'-'}${fmt(t.amount)}</div>`;
@@ -324,12 +330,13 @@ export function renderSavingList(savings){
 export function renderSettings(state){
  const {debts,income,expense,savings,txns,currentMonth,currentTheme}=state;
  const s=monthSummary(state);
+ const monthlyLabel=document.getElementById('monthly-plan-label');if(monthlyLabel)monthlyLabel.textContent=getML(currentMonth);
  const planLabel=document.getElementById('plan-month-label');if(planLabel)planLabel.textContent=getML(currentMonth);
   renderFinList('income',income,s.entries,state);
   renderFinList('expense',expense,s.entries,state);
   const ds=document.getElementById('plan-debt-summary');if(ds)ds.textContent='Nợ tháng này: '+fmt(s.totalDebtPay)+' · Đã trả '+fmt(s.paidDebt)+' · Còn '+fmt(s.unpaidDebt);
-  renderDebtList('td', debts);
-  renderDebtList('tc', debts);
+  renderDebtList('td',state.managedDebts||debts,currentMonth);
+  renderDebtList('tc',state.managedDebts||debts,currentMonth);
   const activeCount=debts.filter(d=>!d.settled).length;
   const sub=document.getElementById('acc-debt-sub');
   if(sub) sub.textContent=`${activeCount} khoản đang hoạt động`;
@@ -337,49 +344,39 @@ export function renderSettings(state){
   setTheme(currentTheme);
 }
 
+
 function renderFinList(mode,items,entries=[],state){
-  const el=document.getElementById('list-'+mode);if(!el)return;
-  if(!items.length){el.innerHTML=`<div style="padding:14px;text-align:center;color:var(--sub);font-size:12px;font-weight:700">Chưa có khoản dự kiến.</div>`;return;}
-  el.innerHTML='';
-  items.forEach((it,i)=>{
-    const row=document.createElement('div');row.className='srow';
-    if(i<items.length-1) row.style.borderBottom='1px solid var(--border)';
-    const debt=mode==='expense'&&state.debts.find(d=>d.id===it.debtId),mark=debt&&state.ticks[state.currentMonth]?.[debt.id];
-    const amount=debt?paymentAmount(debt,mark):it.debtId?0:it.amount;
-    const remaining=it.debtId?(debt&&!mark&&!debt.settled?amount:0):planRemaining(it,entries,mode==='income'?'in':'out');
-    const recurring=isRecurringPlan({recurringPlans:{[state.currentMonth]:state.recurring}},mode,it,state.currentMonth);
-    const ico=mode==='income'?'💵':'🧾';const bg=mode==='income'?'rgba(200,255,87,.1)':'rgba(255,87,87,.1)';
-    row.innerHTML=`<div class="s-ico" style="background:${bg}">${ico}</div>
-      <div class="s-info" onclick="openFinEdit('${mode}','${it.id}')">
-        <div class="s-name">${escapeHTML(it.name)}</div><small class="fin-frequency">${recurring?'Hằng tháng':'Riêng tháng này'}${it.debtId?(debt?' · Theo tab Nợ':' · Khoản nợ đã xóa'):''}</small>
-        <div class="s-val fin-val">${fmt(amount)} · Còn ${fmt(remaining)} <span style="font-weight:600;color:var(--sub)">${escapeHTML(it.note||'')}</span></div>
-      </div><button class="note-link" onclick="openPlanPayment('${mode}','${it.id}')">${it.debtId&&!debt?'Chỉnh sửa':remaining<=0?(debt?'Hoàn tác':mode==='income'?'Đã nhận ↗':'Đã trả ↗'):mode==='income'?'Nhận tiền':'Thanh toán'}</button><button class="s-del" onclick="confirmDelFin('${mode}','${it.id}')">✕</button>`;
-    el.appendChild(row);
-  });
+ const manage=document.getElementById('list-'+mode),monthly=document.getElementById('monthly-'+mode);
+ for(const [el,editing] of [[manage,true],[monthly,false]]){
+  if(!el)continue;el.replaceChildren();
+  const visible=editing?items:items.filter(p=>!p.debtId);
+  if(!visible.length){el.innerHTML='<p class="notebook-hint">Chưa có khoản '+(mode==='income'?'thu':'chi')+' cố định.</p>';continue;}
+  for(const it of visible){
+   const debt=state.managedDebts?.find(d=>d.id===it.debtId),mark=state.ticks[state.currentMonth]?.[it.debtId];
+   const amount=debt?paymentAmount(debt,mark):Number(it.amount)||0;
+   const remaining=planRemaining(it,entries,mode==='income'?'in':'out');
+   const row=document.createElement('div');row.className='srow';
+   const info=document.createElement('div');info.className='s-info';
+   info.innerHTML='<div class="s-name">'+escapeHTML(it.name)+'</div><small class="fin-frequency">'+(it.debtId?'Theo khoản nợ liên kết':isRecurringPlan({recurringPlans:{[state.currentMonth]:state.recurring}},mode,it,state.currentMonth)?'Hằng tháng':'Riêng tháng này')+'</small><div class="s-val">'+fmt(amount)+(editing?'':' · Còn '+fmt(remaining))+'</div>';
+   const button=document.createElement('button');button.className='note-link';
+   if(editing){info.onclick=()=>window.openFinEdit(mode,it.id);button.textContent='Sửa';button.onclick=()=>window.openFinEdit(mode,it.id);}
+   else{button.textContent=remaining<=0?'✓ Hoàn tác':mode==='income'?'Nhận tiền':'Thanh toán';button.setAttribute('aria-label',button.textContent+' '+it.name);button.onclick=()=>window.openPlanPayment(mode,it.id);}
+   row.append(info,button);el.appendChild(row);
+  }
+ }
 }
-
-function renderDebtList(type, debts){
-  const list=debts.filter(d=>d.type===type);
-  const el=document.getElementById('list-'+type);if(!el)return;
-  if(!list.length){el.innerHTML=`<div style="padding:14px;text-align:center;color:var(--sub);font-size:12px;font-weight:700">Chưa có khoản nợ.</div>`;return;}
-  el.innerHTML='';
-  list.forEach((d,i)=>{
-    const row=document.createElement('div');row.className='srow';
-    if(i<list.length-1) row.style.borderBottom='1px solid var(--border)';
-    const ico=type==='td'?'💳':'💰';const bg=type==='td'?'rgba(255,179,71,.1)':'rgba(87,200,255,.1)';
-    const monthly=type==='tc'?tcGetMonthly(d):Number(d.monthly||0);
-    const subText=type==='td'
-      ?`${fmt(monthly)}/th · Đã dùng ${fmt(d.used||0)}/${fmt(d.limit||0)}`
-      :`${fmt(monthly)}/th · Kỳ ${d.curTerm||0}/${d.totalTerm||0} · Dư: ${fmt(tcGetDebt(d))}`;
-    row.innerHTML=`<div class="s-ico" style="background:${bg}">${ico}</div>
-      <div class="s-info" onclick="openDebtEdit('${d.id}')">
-        <div class="s-name">${escapeHTML(d.name)}${d.settled?' 🎉':''}</div>
-        <div class="s-val">${subText}</div>
-      </div><button class="s-del" onclick="confirmDelDebt('${d.id}')">✕</button>`;
-    el.appendChild(row);
-  });
+function renderDebtList(type,debts,month){
+ const el=document.getElementById('list-'+type);if(!el)return;el.replaceChildren();
+ const list=debts.filter(d=>d.type===type);
+ if(!list.length){el.innerHTML='<p class="notebook-hint">Chưa có '+(type==='td'?'thẻ tín dụng':'khoản vay')+'.</p>';return;}
+ for(const d of list){
+  const row=document.createElement('div');row.className='srow';
+  const info=document.createElement('div');info.className='s-info';info.onclick=()=>window.openDebtEdit(d.id);
+  info.innerHTML='<div class="s-name">'+escapeHTML(d.name)+'</div><div class="s-val">'+(isDebtActive(d,month)?d.settled?'Đã tất toán':fmt(paymentAmount(d))+' / tháng':'Đã ngừng theo dõi')+'</div>';
+  const button=document.createElement('button');button.className='note-link';button.textContent='Sửa';button.onclick=()=>window.openDebtEdit(d.id);
+  row.append(info,button);el.appendChild(row);
+ }
 }
-
 // ── RENDER TOOLS ──────────────────────────────────────────────
 export function renderTools(state){
  const {debts,income,expense,savings,loanBook}=state;

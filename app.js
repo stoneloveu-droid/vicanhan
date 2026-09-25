@@ -1,9 +1,10 @@
+import { normalizeData } from './data-schema.js';
 // ── app.js ────────────────────────────────────────────────────
 // State trung tâm, Firebase sync, auth, business logic,
 // tất cả window.* event handlers
 // ─────────────────────────────────────────────────────────────
 
-import { recurringForMonth, plansForMonth, isRecurringPlan, changePlan, monthlyEntries, balanceSummary, accountEntries, planRemaining, monthSummary, paymentAmount, mergeState, escapeHTML, localDate, balanceEntries, recordedEntries, isLegacySavingEntry } from './finance.js';
+import { isDebtActive, recurringForMonth, plansForMonth, isRecurringPlan, changePlan, monthlyEntries, balanceSummary, accountEntries, planRemaining, monthSummary, paymentAmount, mergeState, escapeHTML, localDate, balanceEntries, recordedEntries } from './finance.js';
 import './experience.js';
 import { renderBalanceBook } from './notebook-ui.js';
 import { auth, db, doc, onSnapshot, runTransaction, getDoc, linkWithPopup,
@@ -42,7 +43,7 @@ let isSavingToFirestore=false;
 let loaded=false, baseline=null, pendingSnapshot=null;
 const emptyData=()=>({debts:[],income:[],expense:[],ticks:{},txns:{},savings:[],loanBook:[],walletBase:0,lastAutoMonth:'',balanceNotes:null,monthlyPlans:{},recurringPlans:{}});
 function persisted(){return {debts,income,expense,ticks,txns,savings,loanBook,walletBase,lastAutoMonth,balanceNotes,monthlyPlans,recurringPlans};}
-function applyData(data){ ({debts,income,expense,ticks,txns,savings,loanBook,walletBase,lastAutoMonth,balanceNotes,monthlyPlans,recurringPlans}={...emptyData(),...data}); }
+function applyData(data){ ({debts,income,expense,ticks,txns,savings,loanBook,walletBase,lastAutoMonth,balanceNotes,monthlyPlans,recurringPlans}=normalizeData({...emptyData(),...data})); }
 
 let onboardingStep=1;
 let currentPage = 'home'; // track trang đang hiển thị
@@ -70,7 +71,7 @@ function startRealtimeSync(){
     if(isSavingToFirestore){pendingSnapshot=snap;return;}
     applyData(snap.exists()?snap.data():emptyData());
     baseline=clone(persisted());loaded=true;
-    migrateDebts();setSyncBadge('synced','Đã đồng bộ');renderAll();
+    setSyncBadge('synced','Đã đồng bộ');renderAll();
     if(!snap.exists()&&!window._onboardingDone) openOnboarding();
   },(e)=>{setSyncBadge('error','Không thể tải dữ liệu');showToast('Không thể tải dữ liệu. Kiểm tra kết nối rồi thử lại.');console.error(e);});
 }
@@ -84,7 +85,7 @@ async function saveToFirestore(){
   try{
     const saved=await runTransaction(db,async transaction=>{
       const snap=await transaction.get(ref);
-      const remote={...emptyData(),...(snap.exists()?snap.data():{})};
+      const remote=normalizeData({...emptyData(),...(snap.exists()?snap.data():{})});
       const result=mergeState(before,desired,remote);
       transaction.set(ref,result);return result;
     });
@@ -103,20 +104,6 @@ async function saveToFirestore(){
     pendingSnapshot=null;
   }
 }
-// ── MIGRATE ───────────────────────────────────────────────────
-function migrateDebts(){
-  debts.forEach(d=>{
-    // Existing yearly rates must never be guessed from their magnitude.
-    if(d.type==='tc'&&d.note&&!d.rate){
-      const m=d.note.match(/^Kỳ\s*(\d+)\/(\d+)$/);
-      if(m){d.curTerm=parseInt(m[1]);d.totalTerm=parseInt(m[2]);d.note='';}
-    }
-    if(d.type==='tc'&&!d.principal&&d.debt){d.principal=d.debt;}
-    if(d.type==='td'&&!d.used&&d.debt){d.used=d.debt;d.limit=d.limit||d.debt*2;}
-    if(d.type==='td'&&!d.monthly&&d.monthly!==0){d.monthly=d.used||0;}
-  });
-}
-
 // ── AUTH ──────────────────────────────────────────────────────
 window.signInGoogle=function(){
   const provider=new GoogleAuthProvider();
@@ -215,7 +202,7 @@ onAuthStateChanged(auth,async(user)=>{
 
 // ── RENDER ALL ────────────────────────────────────────────────
 function getState(){
-  return {debts,...plansForMonth({income,expense,monthlyPlans,recurringPlans},currentMonth),recurring:recurringForMonth({income,expense,recurringPlans},currentMonth),ticks,txns,savings,loanBook,walletBase,balanceNotes,
+  return {debts:debts.filter(d=>isDebtActive(d,currentMonth)||ticks[currentMonth]?.[d.id]),managedDebts:debts,...plansForMonth({debts,income,expense,monthlyPlans,recurringPlans},currentMonth),recurring:recurringForMonth({income,expense,recurringPlans},currentMonth),ticks,txns,savings,loanBook,walletBase,balanceNotes,
           walletHidden,currentMonth,currentFilter,
           currentTheme:getCurrentTheme(),showAllTxnsFlag};
 }
@@ -286,9 +273,9 @@ function renderAll(){
   const s=getState();
   // Luôn render trang đang mở để phản ánh thay đổi ngay lập tức
   if(currentPage==='home')               renderHome(s);
-  else if(currentPage==='paid'||currentPage==='debt') renderPaid(s);
+  else if(currentPage==='paid') renderPaid(s);
   else if(currentPage==='txn')           renderTxnPage(s);
-  else if(currentPage==='settings'||currentPage==='finance') renderSettings(s);
+  else if(currentPage==='settings'||currentPage==='finance'||currentPage==='monthly') renderSettings(s);
   else if(currentPage==='report')        renderTools(s);
   else if(currentPage==='tool-loanbook') renderLoanBookList(s.loanBook||[]);
   else if(currentPage==='tool-schedule') renderSchedulePage(s);
@@ -307,7 +294,7 @@ window.switchPage=function(name){
   document.querySelectorAll('.ni').forEach(b=>b.classList.remove('active'));
   document.getElementById('page-'+name)?.classList.add('active');
   // nav highlight: tool sub-pages → highlight report tab
-  const navName=['tool-loanbook','tool-interest','tool-saving-calc','tool-schedule','tool-analyze'].includes(name)?'report':name==='finance'?'txn':name==='debt'?'paid':name;
+  const navName=['tool-loanbook','tool-interest','tool-saving-calc','tool-schedule','tool-analyze'].includes(name)?'report':name==='monthly'?'txn':name==='finance'?'settings':name;
   document.getElementById('nav-'+navName)?.classList.add('active');
   openDetail=null;showAllTxnsFlag=false;
   // Reset txn search khi rời tab
@@ -321,7 +308,7 @@ window.switchPage=function(name){
   if(name==='txn')                renderTxnPage(s);
   if(name==='report')             renderTools(s);
   if(name==='settings')           renderSettings(s);
-  if(name==='debt')               renderPaid(s);
+  if(name==='monthly') renderSettings(s);
   if(name==='finance')            renderSettings(s);
   if(name==='tool-loanbook')      renderLoanBook(s);
   if(name==='tool-interest')      {} // static form
@@ -332,10 +319,8 @@ window.switchPage=function(name){
 };
 
 // ── CARD INTERACTIONS — mở modal chi tiết ────────────────────
-let _detailDebtId=null;
 window.tapTop=function(id){
   const d=debts.find(x=>x.id===id);if(!d)return;
-  _detailDebtId=id;
   const ms=ticks[currentMonth]||{};
   const paid=!!ms[id];
   const content=document.getElementById('ddetail-content');
@@ -377,26 +362,10 @@ window.tapTop=function(id){
         <div style="grid-column:1/-1"><div style="font-size:10px;color:var(--sub)">Hoàn thành</div><div style="font-size:15px;font-weight:800;color:var(--purple)">${pct}%</div></div>
       </div>
       ${d.note?`<div style="margin-top:4px;font-size:12px;color:var(--sub);font-weight:600">📝 ${escapeHTML(d.note)}</div>`:''}
-      ${!d.settled?`<button onclick="window.settleDebtEarly()" style="margin-top:16px;width:100%;padding:12px;background:var(--card2);border:1px solid var(--border);border-radius:14px;color:var(--orange);font-family:'Mulish',sans-serif;font-size:13px;font-weight:800;cursor:pointer">🏁 Đánh dấu đã tất toán</button>`:''}`;
+      `;
   }
-  const paymentButton=document.createElement('button');paymentButton.className='note-link';paymentButton.textContent='Chi tiết thanh toán ↗';paymentButton.onclick=()=>window.editDebtPayment(id);content.appendChild(paymentButton);
+  const paymentButton=document.createElement('button');paymentButton.className='note-link';paymentButton.textContent=paid?'Hoàn tác thanh toán':'Đánh dấu đã trả';paymentButton.onclick=()=>{window.closeModal('modal-debt-detail');window.tapCheck(id);};content.appendChild(paymentButton);
   document.getElementById('modal-debt-detail').classList.add('open');
-};
-
-window.editFromDetail=function(){
-  window.closeModal('modal-debt-detail');
-  if(_detailDebtId) window.openDebtEdit(_detailDebtId);
-};
-
-window.settleDebtEarly=function(){
-  const d=debts.find(x=>x.id===_detailDebtId);if(!d)return;
-  confirmAction(`Đánh dấu "${d.name}" đã tất toán? Thao tác này chỉ cập nhật trạng thái. Hãy ghi khoản chi thực tế trong Thu chi.`,async()=>{
-    d.settled=true;
-    window.closeModal('modal-debt-detail');
-    await saveToFirestore();
-    renderAll();
-    showToast('🎉 Đã tất toán '+d.name);
-  });
 };
 
 // ── MONTH PICKER CALLBACK ─────────────────────────────────────
@@ -416,6 +385,7 @@ window.shiftMonth=function(delta){
   showAllTxnsFlag=false;
   renderAll();
 };
+window.showRemainingExpenses=function(){const el=document.getElementById('remaining-details');el.open=true;el.scrollIntoView({behavior:'smooth',block:'center'});};
 window.openMonthPickerApp=function(){
   window.openMonthPicker(currentMonth);
 };
@@ -438,7 +408,7 @@ window.tapCheck=async function(id){
     if(entry?.accountId)d.paymentAccountId=entry.accountId;
     undoDebtPayment(id);renderAll();await saveToFirestore();renderAll();showToast('Đã hoàn tác thanh toán');return;
   }
-  if(d.settled)return;
+  if(d.settled||!isDebtActive(d,currentMonth))return;
   const accounts=balanceSummary(balanceNotes,walletBase,txns).accounts;
   const previous=Object.values(txns).flat().filter(t=>t.debtId===id).sort((a,b)=>(b.date||'').localeCompare(a.date||''))[0];
   const preferred=d.paymentAccountId||previous?.accountId;
@@ -494,11 +464,11 @@ function refreshTxnPlans(value=''){
   document.getElementById('txn-plan-field').hidden=txnType==='transfer'||!!pendingDebtId;
   document.getElementById('txn-destination-field').hidden=txnType!=='transfer';
 }
-window.openPlanPayment=function(mode,id){
+window.openPlanPayment=async function(mode,id){
   const plan=getState()[mode].find(p=>p.id===id);if(!plan)return;
-  if(plan.debtId&&!debts.some(d=>d.id===plan.debtId)){window.openFinEdit(mode,id);return;}
+  if(plan.debtId&&!debts.some(d=>d.id===plan.debtId))return;
   if(!plan.debtId&&planRemaining(plan,monthlyEntries(getState()),mode==='income'?'in':'out')===0){
-    const entry=(txns[currentMonth]||[]).filter(t=>t.planId===id&&t.type===(mode==='income'?'in':'out')).at(-1);if(entry)openTxnEdit(entry.id);return;
+    const entry=(txns[currentMonth]||[]).filter(t=>t.planId===id&&t.type===(mode==='income'?'in':'out')).at(-1);if(entry){txns[currentMonth]=txns[currentMonth].filter(t=>t.id!==entry.id);await saveToFirestore();renderAll();showToast('Đã hoàn tác');return;}return;
   }
   if(mode==='expense'&&plan.debtId&&debts.some(d=>d.id===plan.debtId)){window.tapCheck(plan.debtId);return;}
   window.openTxnModalType(mode==='income'?'in':'out');
@@ -522,7 +492,7 @@ function undoDebtPayment(id){
     if(Number(d.curTerm)!==old.previousTerm+1)throw Error('Hãy hoàn tác kỳ thanh toán mới nhất trước.');
     d.curTerm=old.previousTerm;d.settled=false;
   }
-  if(old?.txnId)txns[currentMonth]=(txns[currentMonth]||[]).filter(t=>t.id!==old.txnId);
+  txns[currentMonth]=(txns[currentMonth]||[]).filter(t=>t.debtId!==id&&t.id!==old?.txnId);
   delete marks[id];
 }
 
@@ -531,8 +501,6 @@ window.openTxnModal=function(){
   editTxnId=null;
   pendingDebtId=null;
   refreshTxnAccounts();
-  document.getElementById('txn-legacy-option').hidden=true;
-  document.getElementById('txn-count-legacy').checked=false;
   document.getElementById('txn-name').value='';
   const ta=document.getElementById('txn-amount');ta.value='';ta.dataset.raw='';
   document.getElementById('txn-del').style.display='none';
@@ -553,8 +521,6 @@ window.openTxnModal=function(){
 };
 function openTxnEdit(id){
   const t=(txns[currentMonth]||[]).find(x=>x.id===id);if(!t)return;
-  document.getElementById('txn-legacy-option').hidden=!isLegacySavingEntry(t);
-  document.getElementById('txn-count-legacy').checked=false;
   editTxnId=id;
   document.getElementById('txn-name').value=t.name;
   setInputFmt('txn-amount',t.amount);
@@ -619,7 +585,6 @@ window.saveTxn=async function(){
   const previous=list.find(t=>t.id===editTxnId);
   if(previous?.debtId&&(txnType!=='out'||amount!==previous.amount)){showToast('Để thay đổi số tiền trả nợ, hãy hoàn tác thanh toán rồi cập nhật khoản nợ.');return;}
   const t={...previous,id:previous?.id||'t-'+crypto.randomUUID(),name,amount,type:txnType,date:txnDate,accountId,toAccountId:txnType==='transfer'?toAccountId:'',planId};
-  if(document.getElementById('txn-count-legacy').checked)t.isSaving=false;
   if(pendingDebtId&&!previous){
     const d=debts.find(x=>x.id===pendingDebtId);
     if(!d||d.settled||ticks[currentMonth]?.[d.id]){showToast('Khoản nợ đã thay đổi. Vui lòng mở lại.');return;}
@@ -651,7 +616,7 @@ window.showAllTxns=()=>{showAllTxnsFlag=true;renderTxnPage(getState());};
 window.filterTxnSearch=function(){
   const q=(document.getElementById('txn-search')?.value||'').trim().toLowerCase();
   const typeF=document.getElementById('txn-type-filter')?.value||'all';
-  const monthTxns=[...monthlyEntries(getState()),...(txns[currentMonth]||[]).filter(isLegacySavingEntry)];
+  const monthTxns=monthlyEntries(getState());
   const filtered=monthTxns.filter(t=>{
     const matchQ=!q||t.name.toLowerCase().includes(q);
     const matchT=typeF==='all'||t.type===typeF;
@@ -798,9 +763,6 @@ window.toggleLoanCollected=async function(id){
 };
 
 // ── DEBT TYPE SHEET ───────────────────────────────────────────
-window.openDebtTypeSheet=function(){
-  document.getElementById('modal-debt-type').classList.add('open');
-};
 function toggleTcFields(type){
   document.getElementById('md-td-fields').style.display=type==='td'?'block':'none';
   document.getElementById('md-tc-fields').style.display=type==='tc'?'block':'none';
@@ -884,6 +846,7 @@ window.openDebtEdit=function(id){
   document.getElementById('md-type').value=d.type;
   document.getElementById('md-payday').value=d.payDay||'';
   document.getElementById('md-del').style.display='block';
+  document.getElementById('md-del').textContent=isDebtActive(d,currentMonth)?'Ngừng theo dõi':'Theo dõi lại';
   if(d.type==='td'){
     setInputFmt('md-limit',d.limit||0);
     setInputFmt('md-used',d.used||0);
@@ -905,7 +868,6 @@ window.openDebtEdit=function(id){
   toggleTcFields(d.type);
   document.getElementById('modal-debt').classList.add('open');
 };
-window.confirmDelDebt=id=>window.openDebtEdit(id);
 window.saveDebt=async function(){
   const name   =document.getElementById('md-name').value.trim();
   const type   =document.getElementById('md-type').value;
@@ -939,10 +901,11 @@ window.saveDebt=async function(){
   showToast(editDebtId?'✓ Đã cập nhật':'✓ Đã thêm');
 };
 window.deleteDebt=function(){
-  if(!editDebtId) return;
-  confirmAction('Xoá khoản nợ này?',async()=>{
-    debts=debts.filter(x=>x.id!==editDebtId);
-    await saveToFirestore();window.closeModal('modal-debt');renderAll();showToast('🗑 Đã xoá');
+  const d=debts.find(x=>x.id===editDebtId);if(!d)return;
+  const active=isDebtActive(d,currentMonth);
+  confirmAction(active?'Ngừng theo dõi từ tháng đang chọn? Thông tin và lịch sử thanh toán vẫn được giữ.':'Theo dõi lại từ tháng đang chọn?',async()=>{
+    d.activity={...d.activity,[currentMonth]:!active};
+    await saveToFirestore();window.closeModal('modal-debt');renderAll();showToast(active?'Đã ngừng theo dõi':'Đã theo dõi lại');
   });
 };
 
@@ -983,7 +946,6 @@ window.openFinEdit=function(mode,id){
   document.getElementById('mf-del').style.display='block';
   document.getElementById('modal-fin').classList.add('open');
 };
-window.confirmDelFin=(mode,id)=>window.openFinEdit(mode,id);
 window.saveFin=async function(){
   const name=document.getElementById('mf-name').value.trim(),amount=getInputVal('mf-amount'),note=document.getElementById('mf-note').value.trim();
   const scope=document.getElementById('mf-repeat').value,debtId=finMode==='expense'?document.getElementById('mf-debt').value:'';
@@ -1163,7 +1125,7 @@ function updateDebtNavBadge(){
   const today=new Date().getDate();
   const upcoming=debts.filter(d=>!d.settled&&d.payDay&&d.payDay>=today&&d.payDay<=today+7);
   const ms=ticks[currentMonth]||{};
-  const unpaid=debts.filter(d=>!d.settled&&!ms[d.id]);
+  const unpaid=debts.filter(d=>isDebtActive(d,currentMonth)&&!d.settled&&!ms[d.id]);
   const count=unpaid.length;
   if(count>0){
     badge.textContent=count>9?'9+':String(count);
@@ -1207,12 +1169,11 @@ initTheme();
 window.exportCSV=function(){
   const accounts=accountEntries(balanceNotes,walletBase),accountName=id=>accounts.find(a=>a.accountId===id)?.name||'';
   const rows=[['Tháng / phạm vi','Nhóm ghi chép','Tên','Số tiền','Ngày ghi','Ghi chú','Tài khoản','Tài khoản nhận','Mã kế hoạch','Mã khoản nợ']];
-  Object.entries(txns).forEach(([month,list])=>(list||[]).forEach(t=>rows.push([getML(month),isLegacySavingEntry(t)?'Tiết kiệm':t.type==='transfer'?'Chuyển tiền':t.type==='in'?'Thu đã ghi':'Chi đã ghi',t.name,t.amount,t.date||'',t.cat||'',accountName(t.accountId),accountName(t.toAccountId),t.planId||'',t.debtId||''])));
+  Object.entries(txns).forEach(([month,list])=>(list||[]).forEach(t=>rows.push([getML(month),t.type==='transfer'?'Chuyển tiền':t.type==='in'?'Thu đã ghi':'Chi đã ghi',t.name,t.amount,t.date||'',t.cat||'',accountName(t.accountId),accountName(t.toAccountId),t.planId||'',t.debtId||''])));
   const months=new Set([currentMonth,...Object.keys(monthlyPlans),...Object.keys(recurringPlans),...Object.keys(txns),...Object.keys(ticks)]);
   for(const month of [...months].sort()){
     const plan=plansForMonth({income,expense,monthlyPlans,recurringPlans},month);
     for(const mode of ['income','expense'])for(const x of plan[mode])rows.push([getML(month),mode==='income'?'Dự thu':'Dự chi',x.name,x.amount,'',x.note||'','','',x.id,x.debtId||'']);
-    for(const t of monthlyEntries({txns,ticks,debts,currentMonth:month}).filter(t=>t.legacyDebt))rows.push([getML(month),'Trả nợ (bản cũ)',t.name,t.amount,t.date,'Chưa gắn tài khoản','','','',t.debtId]);
   }
   Object.entries(recurringPlans).forEach(([month,plan])=>['income','expense'].forEach(mode=>(plan[mode]||[]).forEach(x=>rows.push(['Cố định từ '+getML(month),mode==='income'?'Thu cố định':'Chi cố định',x.name,x.amount,'',x.note||'','','',x.id,x.debtId||'']))));
   income.forEach(x=>rows.push(['Cố định ban đầu','Dự thu',x.name,x.amount,'',x.note||'']));
@@ -1229,206 +1190,6 @@ window.showMethodHelp=function(){
   const el=document.getElementById('method-help');
   if(el) el.style.display=el.style.display==='none'?'block':'none';
 };
-
-// ── DRAG & DROP REORDER DEBTS ────────────────────────────────
-(function initDebtDragSort(){
-  let drag={
-    el:null, clone:null, type:null, cards:[],
-    startClientY:0, startPageY:0,
-    cloneStartTop:0, scrollEl:null,
-    origIdx:-1, curIdx:-1,
-    active:false
-  };
-  let pressTimer=null;
-
-  /* ── helpers ── */
-  function getCards(type){
-    return [...(document.querySelectorAll('.dcard[data-debt-id]')||[])]
-      .filter(c=>{ const d=debts.find(x=>x.id===c.dataset.debtId); return d&&!d.settled&&d.type===type; });
-  }
-  function cardType(el){ const d=debts.find(x=>x.id===el.dataset.debtId); return d?.type||null; }
-
-  function makeClone(el){
-    const r=el.getBoundingClientRect();
-    const cl=el.cloneNode(true);
-    Object.assign(cl.style,{
-      position:'fixed', left:r.left+'px', top:r.top+'px',
-      width:r.width+'px', margin:'0', zIndex:'9999',
-      pointerEvents:'none', opacity:'0.95',
-      boxShadow:'0 16px 48px rgba(0,0,0,.6)',
-      borderRadius:'16px', transition:'box-shadow .15s',
-      transform:'scale(1.03)', transformOrigin:'center center',
-    });
-    document.body.appendChild(cl);
-    return cl;
-  }
-
-  /* Dịch chuyển các card khác để nhường chỗ — dùng chiều cao thực */
-  function shiftCards(toIdx){
-    const cardH=drag.el.getBoundingClientRect().height+8; // 8 = gap
-    drag.cards.forEach((c,i)=>{
-      if(c===drag.el){ c.style.visibility='hidden'; return; }
-      c.style.transition='transform .2s cubic-bezier(.25,.8,.25,1)';
-      const srcI=drag.cards.indexOf(c);
-      // Nếu card này ở sau vị trí gốc và trước vị trí mới → dịch lên
-      // Nếu card này ở trước vị trí gốc và sau/bằng vị trí mới → dịch xuống
-      let shift=0;
-      if(drag.origIdx<toIdx){
-        if(i>drag.origIdx && i<=toIdx) shift=-cardH;
-      } else {
-        if(i>=toIdx && i<drag.origIdx) shift=cardH;
-      }
-      c.style.transform=shift?`translateY(${shift}px)`:'';
-    });
-  }
-
-  function resetCards(){
-    drag.cards.forEach(c=>{
-      c.style.transform=''; c.style.transition=''; c.style.visibility='';
-    });
-  }
-
-  function getHoverIdx(clientY){
-    const others=drag.cards.filter(c=>c!==drag.el);
-    for(let i=0;i<others.length;i++){
-      const r=others[i].getBoundingClientRect();
-      if(clientY < r.top+r.height/2){
-        // Map back to full array index
-        return drag.cards.indexOf(others[i]);
-      }
-    }
-    return drag.cards.length-1;
-  }
-
-  /* ── start ── */
-  function onStart(clientY, pageY, el){
-    const card=el.closest('.dcard');
-    if(!card) return;
-    const type=cardType(card);
-    if(!type) return;
-
-    const cards=getCards(type);
-    const origIdx=cards.indexOf(card);
-    const r=card.getBoundingClientRect();
-    const scrollEl=document.querySelector('.page.active .scroll')||document.documentElement;
-
-    if(navigator.vibrate) navigator.vibrate(45);
-
-    drag={
-      el:card, clone:null, type, cards,
-      startClientY:clientY, startPageY:pageY,
-      cloneStartTop:r.top,
-      scrollEl, origIdx, curIdx:origIdx, active:true
-    };
-    drag.clone=makeClone(card);
-  }
-
-  /* ── move ── */
-  function onMove(clientY){
-    if(!drag.active||!drag.clone) return;
-    const dy=clientY-drag.startClientY;
-    drag.clone.style.top=(drag.cloneStartTop+dy)+'px';
-
-    const newIdx=getHoverIdx(clientY);
-    if(newIdx!==drag.curIdx){
-      drag.curIdx=newIdx;
-      shiftCards(newIdx);
-    }
-
-    // auto-scroll
-    const ZONE=90, SPEED=10, vh=window.innerHeight;
-    if(clientY<ZONE) drag.scrollEl.scrollTop-=SPEED;
-    else if(clientY>vh-ZONE) drag.scrollEl.scrollTop+=SPEED;
-  }
-
-  /* ── end ── */
-  async function onEnd(){
-    if(!drag.active) return;
-    drag.active=false;
-    clearTimeout(pressTimer); pressTimer=null;
-
-    if(drag.clone){ drag.clone.remove(); drag.clone=null; }
-    resetCards();
-
-    if(drag.curIdx!==drag.origIdx && drag.curIdx>=0){
-      const ids=drag.cards.map(c=>c.dataset.debtId);
-      const fromId=ids[drag.origIdx];
-      ids.splice(drag.origIdx,1);
-      ids.splice(drag.curIdx,0,fromId);
-
-      // Rebuild debts: thay section này, giữ nguyên loại kia + settled
-      const newDebts=[];
-      let inserted=false;
-      for(const d of debts){
-        if(d.settled){ newDebts.push(d); continue; }
-        if(d.type===drag.type&&!inserted){
-          ids.map(id=>debts.find(x=>x.id===id)).filter(Boolean).forEach(x=>newDebts.push(x));
-          inserted=true;
-        } else if(d.type!==drag.type){
-          newDebts.push(d);
-        }
-      }
-      debts.length=0; newDebts.forEach(d=>debts.push(d));
-      renderAll();
-      await saveToFirestore();
-      showToast('✓ Đã sắp xếp');
-    }
-
-    drag={el:null,clone:null,type:null,cards:[],startClientY:0,startPageY:0,cloneStartTop:0,scrollEl:null,origIdx:-1,curIdx:-1,active:false};
-  }
-
-  /* ── Touch events ── */
-  let pendingTouch=null;
-
-  document.addEventListener('touchstart',e=>{
-    const handle=e.target.closest('.drag-handle');
-    if(!handle){ clearTimeout(pressTimer); return; }
-    const t=e.touches[0];
-    pendingTouch={clientX:t.clientX, clientY:t.clientY, pageY:t.pageY, handle};
-    clearTimeout(pressTimer);
-    pressTimer=setTimeout(()=>{ onStart(pendingTouch.clientY, pendingTouch.pageY, pendingTouch.handle); },550);
-  },{passive:true});
-
-  document.addEventListener('touchmove',e=>{
-    if(drag.active){
-      onMove(e.touches[0].clientY);
-      e.preventDefault();
-      return;
-    }
-    // Hủy long-press nếu scroll
-    if(pendingTouch){
-      const t=e.touches[0];
-      if(Math.abs(t.clientY-pendingTouch.clientY)>10||Math.abs(t.clientX-(pendingTouch.clientX||t.clientX))>10){
-        clearTimeout(pressTimer); pressTimer=null;
-      }
-    }
-  },{passive:false});
-
-  document.addEventListener('touchend',async e=>{
-    clearTimeout(pressTimer); pressTimer=null; pendingTouch=null;
-    await onEnd();
-  },{passive:true});
-
-  document.addEventListener('touchcancel',async()=>{
-    clearTimeout(pressTimer); pressTimer=null; pendingTouch=null;
-    await onEnd();
-  },{passive:true});
-
-  /* ── Mouse fallback ── */
-  document.addEventListener('mousedown',e=>{
-    const handle=e.target.closest('.drag-handle');
-    if(!handle) return;
-    pressTimer=setTimeout(()=>{
-      onStart(e.clientY, e.pageY, handle);
-      const mm=ev=>onMove(ev.clientY);
-      const mu=async()=>{ await onEnd(); document.removeEventListener('mousemove',mm); document.removeEventListener('mouseup',mu); };
-      document.addEventListener('mousemove',mm);
-      document.addEventListener('mouseup',mu);
-    },550);
-  });
-  document.addEventListener('mouseup',()=>{ if(!drag.active){ clearTimeout(pressTimer); pressTimer=null; } });
-})();
-
 
 // Shared error boundary for asynchronous UI handlers.
 for(const [name,handler] of Object.entries(window)){

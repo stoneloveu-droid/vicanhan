@@ -161,7 +161,7 @@ html[data-motion=off] *,html[data-motion=off] *:before,html[data-motion=off] *:a
 #page-home .report-overview .ro-row span:not(.ro-val){font-size:11px}
 [data-theme=light] .saving-notes-card{background:#ede4fa}
 
-.legacy-entry{display:block;font-size:9px;color:var(--orange);margin-top:4px;line-height:1.5}
+.txn-account-note{display:block;font-size:9px;color:var(--orange);margin-top:4px;line-height:1.5}
 
 .wallet-breakdown{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:18px 0}.wallet-breakdown span{display:block;font-size:12px;opacity:.7;margin-bottom:5px}.wallet-breakdown strong{font-size:18px}.type-toggle .tt-btn{flex:1;font-size:12px}.fg[hidden]{display:none!important}#modal-txn .msheet{max-height:90dvh;overflow-y:auto}.note-link:disabled{opacity:.5}#unassigned-notice{margin:12px 20px}
 
@@ -227,3 +227,25 @@ html[data-motion=off] *,html[data-motion=off] *:before,html[data-motion=off] *:a
 [data-theme=light] #page-home .wc-caption,[data-theme=light] #page-home .wallet-breakdown span{color:#6d607e}
 [data-theme=light] #page-home .wallet-breakdown,[data-theme=light] #page-home .wallet-breakdown>div+div{border-color:#62508622}
 [data-theme=light] #page-home .wc-amount,[data-theme=light] #page-home .wc-eye{color:#312544}
+
+/* Settings owns templates; monthly views only confirm or undo payments. */
+.management-content{padding:0 16px 24px}
+.management-content section{margin-bottom:24px}
+.management-content .add-row{width:100%;margin:10px 0}
+.management-content .srow{gap:12px;border-bottom:1px solid var(--border)}
+.management-content .srow:last-child{border-bottom:0}
+.management-content .s-info{min-width:0;flex:1}
+.management-content .s-name{overflow-wrap:anywhere}
+.management-content .note-link{flex-shrink:0}
+.management-link{width:100%;text-align:left;background:transparent;border:0;color:var(--text);font:inherit}
+.management-link small{display:block;margin-top:5px;color:var(--sub);font-size:11px;font-weight:500}
+.remaining-details{margin:14px 16px;padding:14px;border:1px solid var(--border);border-radius:16px;color:var(--sub);font-size:12px}
+.remaining-details summary{cursor:pointer;font-weight:700;color:var(--text)}
+.remaining-row{display:flex;justify-content:space-between;gap:12px;width:100%;padding:12px 0;background:transparent;border:0;border-bottom:1px solid var(--border);color:var(--text);font:inherit;text-align:left}
+.remaining-row strong{white-space:nowrap}
+#remaining-items{padding-top:8px}
+
+#page-finance .ph-title,#page-monthly .ph-title{font-size:20px;min-width:0;flex:1;line-height:1.25}
+#page-finance .page-header>.note-link,#page-monthly .page-header>.note-link{white-space:nowrap;flex-shrink:0}
+
+.hero-breakdown{display:block;margin:8px 0 0;padding:0;border:0;background:transparent;color:inherit;opacity:.8;font:inherit;font-size:11px;line-height:1.6;text-align:left;cursor:pointer}

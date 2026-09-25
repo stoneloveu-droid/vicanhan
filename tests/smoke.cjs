@@ -5,7 +5,7 @@ const fs=require('fs'),assert=require('assert/strict');
  try{
  const page=await browser.newPage({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
  page.setDefaultTimeout(12000);const errors=[];page.on('pageerror',e=>errors.push(e.message));
- const data=()=>page.evaluate(()=>window.__previewData());
+ const data=()=>page.evaluate(async()=>{const {normalizeData}=await import('/data-schema.js');return normalizeData(window.__previewData());});
  const tab=n=>page.click('#nav-'+n);
  const save=async modal=>{await page.click(modal+' .mbtn-save');try{await page.waitForSelector(modal,{state:'hidden'});}catch(e){console.error('Save diagnostics',await page.locator('#toast').textContent(),await page.locator('#txn-date').inputValue(),await page.locator('#txn-amount').inputValue(),await page.locator('#txn-name').inputValue(),await page.locator('#txn-amount').getAttribute('data-raw'));throw e;}};
  const expectText=async(id,text)=>assert.equal(await page.locator('#'+id).textContent(),text);
@@ -24,10 +24,10 @@ const fs=require('fs'),assert=require('assert/strict');
  await tab('txn');await page.locator('.txn-row').filter({hasText:'Ăn trưa'}).click();await page.click('#txn-del');await page.click('#ca-ok');await page.waitForSelector('#modal-txn',{state:'hidden'});
  await tab('home');await expectText('hero-balance','10.000.000đ');
  // Partial planned payment releases the same reserve; full payment does not double count.
- await page.locator('.available-card').first().click();await page.locator('#list-expense .note-link').click();
+ await page.locator('.available-card').first().click();await page.locator('#monthly-expense .note-link').click();
  await page.selectOption('#txn-account','bank');await page.fill('#txn-amount','3000000');await save('#modal-txn');
  await tab('home');await expectText('hero-balance','7.000.000đ');await expectText('hero-reserved','4.000.000đ');await expectText('kpi-wallet','3.000.000đ');
- await page.locator('.available-card').first().click();await page.locator('#list-expense .note-link').click();await page.selectOption('#txn-account','bank');await save('#modal-txn');
+ await page.locator('.available-card').first().click();await page.locator('#monthly-expense .note-link').click();await page.selectOption('#txn-account','bank');await save('#modal-txn');
  await tab('home');await expectText('hero-balance','3.000.000đ');await expectText('hero-reserved','0đ');await expectText('kpi-wallet','3.000.000đ');
  // Transfer changes distribution, not income or spending.
  await transaction('transfer','Rút tiền',500000,'bank');await page.selectOption('#txn-destination','cash');await save('#modal-txn');
@@ -49,7 +49,7 @@ const fs=require('fs'),assert=require('assert/strict');
  assert.deepEqual(await data(),beforeFail);assert(await page.locator('#modal-txn').evaluate(e=>e.classList.contains('open')));
  await page.evaluate(()=>window.__failSave=false);await page.click('#modal-txn .mbtn-cancel');
  // Negative available amount stays visible.
- await page.locator('.available-card').first().click();await page.locator('#list-expense .s-info').click();await page.fill('#mf-amount','50000000');await save('#modal-fin');
+ await tab('settings');await page.click('.management-link');await page.locator('#list-expense .s-info').click();await page.fill('#mf-amount','50000000');await save('#modal-fin');
  await tab('home');await expectText('kpi-wallet','-12.600.000đ');assert((await page.locator('#wallet-status').textContent()).includes('Thiếu'));
 
  await tab('txn');await page.locator('.mnav-btn').first().click();await tab('home');await expectText('available-amount','7.000.000đ');
@@ -89,7 +89,7 @@ const fs=require('fs'),assert=require('assert/strict');
  assert.equal((await data()).debts.find(d=>d.id===loan.id).paymentAccountId,'cash');
  await page.click('#cb-demo-loan');await page.waitForFunction(id=>!Object.values(window.__previewData().ticks).some(m=>m[id]),loan.id);
  // Legacy records survive and do not acquire a made-up account.
- await tab('txn');assert((await page.locator('#legacy-saving-hint').textContent()).includes('tiết kiệm'));
+ await tab('txn');assert.equal(await page.locator('#legacy-saving-hint').count(),0);assert.equal((await data()).savings.filter(s=>s.id==='s1').length,1);
  // Tools and all five tabs remain usable on small screens.
  for(const [label,id,fields] of [['Tính lãi vay','tool-interest',[['ti-principal','10000000'],['ti-rate','0'],['ti-terms','12']]],['Lãi kép tiết kiệm','tool-saving-calc',[['sc-goal','12000000'],['sc-rate','0'],['sc-months','12']]]]){
   await tab('report');await page.locator('#page-report').getByText(label,{exact:true}).click();for(const [field,value] of fields)await page.fill('#'+field,value);await page.click('#page-'+id+' .tool-run-btn');assert(!(await page.locator('#page-'+id+' .tool-result').textContent()).includes('NaN'));

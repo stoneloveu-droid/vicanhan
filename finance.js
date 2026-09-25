@@ -10,14 +10,8 @@ export function paymentAmount(debt, mark) {
   return mark && typeof mark === 'object' ? Number(mark.amount) || 0 : debt.type === 'tc' ? tcGetMonthly(debt) : Number(debt.monthly) || 0;
 }
 
-export function isLegacySavingEntry(entry) {
-  return entry.isSaving === true && String(entry.id||'').startsWith('sv-txn-');
-}
-export function recordedEntries(entries=[]) { return entries.filter(entry=>!isLegacySavingEntry(entry)); }
-export function balanceEntries(balanceNotes, walletBase=0) {
-  if(Array.isArray(balanceNotes)) return balanceNotes;
-  return Number(walletBase)!==0?[{id:'legacy-wallet',name:'Số dư ban đầu',kind:'other',amount:Number(walletBase),date:'',note:''}]:[];
-}
+export function recordedEntries(entries=[]) { return entries; }
+export function balanceEntries(balanceNotes) { return Array.isArray(balanceNotes)?balanceNotes:[]; }
 export function accountEntries(balanceNotes,walletBase=0){
   const aliases=new Map();
   return balanceEntries(balanceNotes,walletBase).map(note=>{
@@ -51,6 +45,10 @@ export function balanceSummary(balanceNotes,walletBase=0,txns={},asOf=localDate(
 export function recurringForMonth({income=[],expense=[],recurringPlans={}},month){
   const key=Object.keys(recurringPlans).filter(k=>k<=month).sort().at(-1);
   return key?recurringPlans[key]:{income,expense};
+}
+export function isDebtActive(debt,month) {
+ const key=Object.keys(debt.activity||{}).filter(k=>k<=month).sort().at(-1);
+ return key?debt.activity[key]!==false:true;
 }
 export function plansForMonth(state,month){
   const recurring=recurringForMonth(state,month),override=state.monthlyPlans?.[month];
@@ -106,17 +104,10 @@ export function changePlan(state,month,mode,item,scope,remove=false){
   }
   return {recurringPlans,monthlyPlans};
 }
-export function monthlyEntries({txns={},ticks={},debts=[],currentMonth,today=localDate()}){
+export function monthlyEntries({txns={},currentMonth,today=localDate()}){
   const asOf=currentMonth<today.slice(0,7)?currentMonth+'-31':today;
   const entries=recordedEntries(txns[currentMonth]||[]).filter(t=>!t.date||t.date<=asOf);
-  const historical=[];
-  for(const [id,mark] of Object.entries(ticks[currentMonth]||{})){
-    if(!mark||mark.date&&mark.date>asOf)continue;
-    const debt=debts.find(d=>d.id===id),amount=mark&&typeof mark==='object'?Number(mark.amount)||0:debt?paymentAmount(debt):0;
-    const linked=sum(entries.filter(t=>t.type==='out'&&(t.debtId===id||(mark.txnId&&t.id===mark.txnId))));
-    if(amount>linked)historical.push({id:'legacy-debt:'+id,debtId:id,name:'Trả nợ: '+(debt?.name||'Khoản nợ cũ'),amount:amount-linked,type:'out',date:mark.date||'',legacyDebt:true});
-  }
-  return [...entries,...historical];
+  return entries;
 }
 
 export function planRemaining(plan,entries,type){
@@ -130,18 +121,18 @@ export function monthSummary({debts=[],income=[],expense=[],ticks={},txns={},sav
   const txnIn=sum(entries.filter(t=>t.type==='in')),txnOut=sum(entries.filter(t=>t.type==='out'));
   const fixedIncome=sum(income),fixedExpense=sum(standaloneExpense);
   const paidDebt=Object.entries(marks).reduce((s,[id,mark])=>{const debt=debts.find(d=>d.id===id);return s+(mark&&typeof mark==='object'?(Number(mark.amount)||0):mark&&debt?paymentAmount(debt):0);},0);
-  const unpaidDebt=debts.reduce((s,d)=>s+(!d.settled&&!marks[d.id]?paymentAmount(d):0),0);
+  const unpaidDebt=debts.reduce((s,d)=>s+(isDebtActive(d,month)&&!d.settled&&!marks[d.id]?paymentAmount(d):0),0);
   const balances=balanceSummary(balanceNotes,walletBase,txns,asOf);
   const remainingExpense=standaloneExpense.reduce((s,p)=>s+planRemaining(p,entries,'out'),0);
   const remainingIncome=income.reduce((s,p)=>s+planRemaining(p,entries,'in'),0);
   const reserved=remainingExpense+unpaidDebt;
   const plannedExpense=fixedExpense+paidDebt+unpaidDebt,paidPlanned=plannedExpense-reserved;
   const unassigned=recordedEntries(Object.values(txns).flat()).filter(t=>(!t.date||t.date<=asOf)&&!t.accountId&&t.type!=='transfer').length;
-  return {entries,plannedExpense,paidPlanned,legacyDebtCount:entries.filter(t=>t.legacyDebt).length,txnIn,txnOut,totalIn:txnIn,totalOut:txnOut,net:txnIn-txnOut,fixedIncome,fixedExpense,
+  return {entries,plannedExpense,paidPlanned,txnIn,txnOut,totalIn:txnIn,totalOut:txnOut,net:txnIn-txnOut,fixedIncome,fixedExpense,
     totalDebtPay:paidDebt+unpaidDebt,paidDebt,unpaidDebt,remainingExpense,remainingIncome,reserved,
     available:balances.total-reserved,accounts:balances.accounts,unassigned,
     balanceTotal:balances.total,savingTotal:sum(savings),
-    debtLeft:debts.filter(d=>!d.settled).reduce((s,d)=>s+(d.type==='tc'?tcGetDebt(d):Number(d.used)||0),0)};
+    debtLeft:debts.filter(d=>isDebtActive(d,month)&&!d.settled).reduce((s,d)=>s+(d.type==='tc'?tcGetDebt(d):Number(d.used)||0),0)};
 }
 // Merge independent changes, reject competing edits instead of overwriting.
 // Firestore map field order is not significant; array item order still is.

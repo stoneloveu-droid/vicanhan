@@ -1,7 +1,11 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {dueDate,plansForMonth,changePlan,monthSummary,mergeState,escapeHTML,localDate,balanceSummary,balanceEntries,recordedEntries} from '../finance.js';
+import {dueDate,plansForMonth,changePlan,monthSummary as summarize,mergeState,escapeHTML,localDate,balanceSummary,balanceEntries} from '../finance.js';
+import {normalizeData} from '../data-schema.js';
+import {isDebtActive} from '../finance.js';
+const monthSummary=state=>summarize(normalizeData(state));
+const recordedEntries=entries=>normalizeData({txns:{month:entries}}).txns.month;
 import {tcScheduleTable,tcPaymentAtTerm,migrateRate} from '../calc.js';
 test('notes and savings do not change cash flow; legacy paid debt is included once',()=>{
  const s={currentMonth:'2026-09',walletBase:100,income:[{amount:1000}],expense:[{amount:200}],savings:[{amount:800}],txns:{'2026-09':[{type:'out',amount:50}]},debts:[{id:'a',type:'td',monthly:300}],ticks:{}};
@@ -15,7 +19,7 @@ test('latest note per named account is summed, not all history',()=>{
  assert.equal(balanceSummary([...notes,{id:'5',name:'VCB',kind:'bank',amount:0,date:'2026-09-03'}]).total,25);
 });
 test('legacy opening note is retained without inventing a date; deleted notes stay deleted',()=>{
- assert.equal(balanceEntries(null,100)[0].date,'');assert.equal(balanceSummary(null,100).total,100);assert.equal(balanceSummary([],100).total,0);assert.equal(balanceEntries(null,0).length,0);
+ assert.equal(normalizeData({walletBase:100}).balanceNotes[0].date,'');assert.equal(balanceSummary(normalizeData({walletBase:100}).balanceNotes).total,100);assert.equal(balanceSummary([],100).total,0);assert.equal(balanceEntries(null,0).length,0);
 });
 test('old auto-generated savings transactions are kept but excluded until explicitly counted',()=>{
  const entries=[{id:'sv-txn-s1',isSaving:true,type:'out',amount:1000},{id:'manual',type:'out',amount:50},{id:'ordinary',isSaving:true,type:'out',amount:10}];
@@ -85,7 +89,7 @@ test('debt ticks, forecast and actual expenses stay aligned without double count
  state.ticks={'2026-09':{d:{amount:300}}};s=monthSummary(state);
  assert.equal(s.plannedExpense,300);assert.equal(s.reserved,0);assert.equal(s.paidPlanned,300);assert.equal(s.totalOut,300);
  state.txns={'2026-09':[{id:'t',type:'out',amount:300,debtId:'d',date:'2026-09-24'}]};
- s=monthSummary(state);assert.equal(s.totalOut,300);assert.equal(s.legacyDebtCount,0);
+ s=monthSummary(state);assert.equal(s.totalOut,300);assert.equal(s.entries.filter(t=>t.debtId==='d').length,1);
  state.txns['2026-09'].push({id:'extra',type:'out',amount:50,date:'2026-09-24'});
  s=monthSummary(state);assert.equal(s.totalOut,350);assert.equal(s.reserved,0);assert.equal(s.paidPlanned,300);
 });
@@ -159,4 +163,35 @@ test('undo payment ignores Firestore map key ordering but preserves real conflic
  assert.throws(()=>mergeState(base,local,changed));
  const retick=structuredClone(base);retick.ticks['2026-09'].card.txnId='t-new';retick.txns['2026-09'][0].id='t-new';
  assert.deepEqual(mergeState(base,retick,remote),retick);
+});
+
+test('normalization preserves balances, notes and payment totals and is idempotent',()=>{
+ const raw={walletBase:1000,debts:[{id:'card',name:'Thẻ',type:'td',monthly:100}],ticks:{'2026-09':{card:{amount:100}}},txns:{'2026-09':[{id:'sv-txn-s',isSaving:true,type:'out',amount:200,name:'Quỹ'},{id:'other',type:'out',amount:50}]},savings:[{id:'s',amount:200,name:'Quỹ'}]};
+ const before=structuredClone(raw),data=normalizeData(raw);
+ assert.deepEqual(raw,before);
+ assert.deepEqual(normalizeData(data),data);
+ const s=summarize({...data,currentMonth:'2026-09',today:'2026-09-25'});
+ assert.equal(s.balanceTotal,1000);assert.equal(s.totalOut,150);assert.equal(s.reserved,0);
+ assert.equal(data.savings.length,1);assert.equal(data.txns['2026-09'].length,2);
+ assert.equal(data.txns['2026-09'].find(t=>t.debtId==='card').accountId,'');
+});
+test('duplicate debt plans are linked once while unrelated costs remain payable',()=>{
+ const raw={currentMonth:'2026-09',today:'2026-09-25',debts:[{id:'card',name:'Thẻ A',type:'td',monthly:100}],expense:[{id:'copy',name:'Thẻ A',amount:100},{id:'rent',name:'Tiền nhà',amount:200}],ticks:{},txns:{}};
+ const data=normalizeData(raw);
+ assert.equal(data.expense[0].debtId,'card');assert.equal(summarize(data).reserved,300);
+ data.ticks={'2026-09':{card:{amount:100}}};
+ assert.equal(summarize(normalizeData(data)).reserved,200);
+ data.txns={'2026-09':[{id:'rent-paid',type:'out',planId:'rent',amount:200}]};
+ assert.equal(summarize(normalizeData(data)).reserved,0);
+ const ambiguous=normalizeData({...raw,debts:[raw.debts[0],{...raw.debts[0],id:'other'}]});
+ assert.equal(ambiguous.expense[0].debtId,undefined);
+});
+test('stopping and resuming a debt preserves past forecasts and paid history',()=>{
+ const d={id:'d',type:'td',monthly:100,activity:{'2026-09':false,'2026-11':true}};
+ assert(isDebtActive(d,'2026-08'));assert(!isDebtActive(d,'2026-10'));assert(isDebtActive(d,'2026-11'));
+ const state={debts:[d],txns:{},ticks:{'2026-09':{d:{amount:100}}},today:'2026-12-01'};
+ assert.equal(monthSummary({...state,currentMonth:'2026-08'}).reserved,100);
+ const paid=monthSummary({...state,currentMonth:'2026-09'});assert.equal(paid.reserved,0);assert.equal(paid.totalOut,100);
+ assert.equal(monthSummary({...state,currentMonth:'2026-10'}).reserved,0);
+ assert.equal(monthSummary({...state,currentMonth:'2026-11'}).reserved,100);
 });

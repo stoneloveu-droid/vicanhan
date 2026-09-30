@@ -49,15 +49,15 @@
       </div>
       <div class="wc-amount" id="kpi-wallet">—</div>
       <p class="wc-caption" id="wallet-status">Theo số dư và các khoản chưa thanh toán bạn đã nhập.</p><button class="hero-breakdown" id="hero-breakdown" onclick="showRemainingExpenses()"></button>
-      <div class="wallet-breakdown"><div><span>Tổng thu dự kiến</span><strong id="hero-month-income">—</strong></div><button class="reserved-button" onclick="showRemainingExpenses()" aria-label="Xem các khoản còn phải chi"><span>Còn phải chi ↗</span><strong id="hero-reserved">—</strong></button></div>
+      <div class="wallet-breakdown"><button class="reserved-button" onclick="showRemainingExpenses()" aria-label="Xem các khoản còn phải chi"><span>Còn phải chi ↗</span><strong id="hero-reserved">—</strong></button></div>
     </section>
     <div class="quick-actions"><button class="quick-action" onclick="openTxnModalType('in')"><b>↙</b>Ghi thu</button><button class="quick-action" onclick="openTxnModalType('out')"><b>↗</b>Ghi chi</button><button class="quick-action" onclick="switchPage('paid')"><b>◷</b>Trả nợ</button></div>
     <section class="wallet-balance-card"><div class="wallet-balance-heading"><span>Tiền trong ví · Cộng dồn</span><small id="wallet-balance-status">Theo ghi chép</small></div><strong id="hero-balance">—</strong><p>Số tiền ước tính từ thu chi đã ghi nhận.</p><div class="wallet-actions"><button class="notebook-add" onclick="openBalanceNote()">Cập nhật số dư</button><button class="note-link" onclick="openBalanceBook()">Lịch sử ↗</button></div></section>
     <section class="dashboard-month" aria-label="Thu chi tháng">
-      <div class="sec-hdr"><span id="dashboard-month-label">Thu chi tháng</span><button class="note-link" onclick="switchPage('txn')">Giao dịch ↗</button></div>
+      <div class="sec-hdr"><span id="dashboard-month-label">Thu chi tháng</span><button class="note-link" onclick="showMonthlyReport()">Xem báo cáo ↗</button></div>
       <div class="dashboard-flow"><div><span><i class="flow-in">↙</i> Đã thu</span><strong class="green" id="kpi-income-mini">—</strong></div><div><span><i class="flow-out">↗</i> Đã chi</span><strong class="red" id="kpi-expense-mini">—</strong></div></div>
       <button class="available-card dashboard-budget" onclick="switchPage('monthly')">
-        <div class="budget-heading"><span>Dự chi cả tháng <span aria-hidden="true">↗</span></span><strong id="hero-planned">—</strong></div>
+        <div class="budget-heading"><span>Tổng chi dự kiến <span aria-hidden="true">↗</span></span><strong id="hero-planned">—</strong></div>
         <div class="budget-track" role="progressbar" aria-label="Dự chi đã thanh toán" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="budget-progress"><span id="budget-progress-fill"></span></div>
         <div class="budget-caption"><span>Đã thanh toán</span><strong id="hero-paid-planned">—</strong></div>
       </button>
@@ -66,18 +66,18 @@
       <button class="available-card saving-notes-card" onclick="switchPage('report')"><span class="shortcut-icon" aria-hidden="true">✧</span><span class="shortcut-label">Ghi chú tiết kiệm</span><strong id="home-saving-notes">—</strong><span class="shortcut-caption">Xem ghi chú riêng ↗</span></button>
       <button class="mini-debt" onclick="switchPage('paid')"><span class="shortcut-icon" aria-hidden="true">◷</span><span class="shortcut-label">Dư nợ</span><strong id="home-debt-left">—</strong><span class="shortcut-caption">Tháng này còn <span id="home-unpaid">—</span> ↗</span></button>
     </div>
-    <details class="dashboard-details"><summary>Chi tiết thu chi <span>⌄</span></summary>
-    <div class="report-overview">
+    <details class="dashboard-details" id="monthly-report"><summary>Báo cáo tháng <span>⌄</span></summary>
+    <p id="report-privacy" class="notebook-hint" hidden>Số tiền đang được ẩn. Nhấn biểu tượng mắt trên thẻ tổng quan để xem.</p><div class="report-overview">
       <div class="ro-title" id="rpt-title">Tổng quan tháng</div><div class="ro-row"><div class="ro-dot" style="background:var(--teal)"></div><span>Còn phải chi</span><span class="ro-val" id="available-amount">—</span></div><p class="notebook-hint" id="available-detail"></p><span id="kpi-debt-pay-mini" hidden></span>
       <div class="ro-row"><div class="ro-dot" style="background:#4CAF50"></div><span>Đã thu</span><span class="ro-val green" id="rpt-income">—</span></div>
       <div class="ro-row ro-sub"><div class="ro-dot" style="background:#F44336"></div><span>Dự chi cả tháng</span><span class="ro-val red" id="rpt-expense-fixed">—</span></div>
-      <div class="ro-row ro-sub"><div class="ro-dot" style="background:#FF9800"></div><span>Dự thu cả tháng</span><span class="ro-val orange" id="rpt-expense-extra">—</span></div>
+      <div class="ro-row ro-sub"><div class="ro-dot" style="background:#FF9800"></div><span>Tổng thu dự kiến</span><span class="ro-val orange" id="rpt-expense-extra">—</span></div>
       <div class="ro-row"><div class="ro-dot" style="background:#F44336"></div><span>Đã chi</span><span class="ro-val red" id="rpt-expense">—</span></div>
       <div class="ro-row"><div class="ro-dot" style="background:#57C8FF"></div><span>Trong đó: trả nợ</span><span class="ro-val blue" id="rpt-debt-pay">—</span></div>
       <div class="ro-row"><div class="ro-dot" style="background:#C57BFF"></div><span>Chênh lệch thu–chi</span><span class="ro-val purple" id="rpt-saving">—</span></div>
     </div>
     <div class="report-card">
-      <div class="rc-title">Chi đã ghi theo danh mục</div>
+      <div class="rc-title">Cơ cấu chi trong tháng</div>
       <div class="donut-row">
         <div class="donut-wrap">
           <canvas id="donut-chart" width="128" height="128"></canvas>
@@ -87,8 +87,10 @@
       </div>
     </div>
 
+    <div class="report-card"><div class="rc-title">Cơ cấu thu trong tháng</div><div class="donut-row"><div class="donut-wrap"><canvas id="income-chart" width="128" height="128"></canvas><div class="donut-center"><div class="dc-val" id="income-total">—</div><div class="dc-lbl">Thu đã ghi</div></div></div><div class="donut-legend" id="income-legend"></div></div></div>
+    <div class="report-card"><div class="rc-title">Chi tiết theo nhóm</div><div id="report-groups"></div></div>
     </details>
-    <div id="past-month-banner-home" class="notebook-hint" style="display:none">Số dư được tính đến cuối tháng đã chọn; tháng tương lai dùng số dư hiện tại.</div>
+    <div id="past-month-banner-home" class="notebook-hint" style="display:none">Báo cáo theo tháng đã chọn. Tiền trong ví hiển thị số dư hiện tại.</div>
     <details class="remaining-details" id="remaining-details"><summary>Các khoản còn phải chi</summary><div id="remaining-items"></div></details><span id="kpi-income" hidden></span><span id="kpi-expense" hidden></span><span id="kpi-debt-pay" hidden></span><span id="kpi-remain" hidden></span>
 
   </div>
@@ -122,7 +124,7 @@
       </div>
     </div>
     <span id="ps-paid" style="display:none"></span>
-    <div class="debt-toolbar"><button onclick="openMonthPickerApp()" id="debt-month-label">Chọn tháng</button><button onclick="switchPage('tool-schedule')">Lịch thanh toán ↗</button></div>
+    <div class="debt-toolbar"><span id="debt-month-label">Tháng hiện tại</span><button onclick="switchPage('tool-schedule')">Lịch thanh toán ↗</button></div>
     <div class="seg2-wrap"><div class="seg2"><button class="seg2-btn active" onclick="filterTab('all',this)">Tất cả</button><button class="seg2-btn" onclick="filterTab('unpaid',this)">Chưa trả</button><button class="seg2-btn" onclick="filterTab('paid2',this)">Đã trả</button></div></div><p class="debt-note">Chạm để xem chi tiết · Tick để trả hoặc hoàn tác</p>
     <div id="card-list"></div>
     <div style="height:8px"></div>
@@ -132,7 +134,7 @@
 <!-- TAB 3: THU CHI -->
 <div class="page" id="page-txn">
   <div class="page-header">
-    <div><div class="ph-title">Thu chi</div><div class="ph-sub">Thu nhập và chi tiêu trong tháng</div></div>
+    <div><div class="ph-title">Thu chi</div><div class="ph-sub">Ghi nhận thu nhập và chi tiêu</div></div>
     <div class="ph-right">
       <button class="fin-fixed-btn" onclick="switchPage('monthly')" title="Thu chi cố định">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
@@ -145,18 +147,12 @@
       Lịch sử giao dịch của tháng đã chọn.
     </div>
     <div class="month-nav">
-      <button class="mnav-btn" onclick="shiftMonth(-1)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <button class="mnav-btn" aria-label="Tháng trước" onclick="shiftMonth(-1)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg></button>
       <div class="mnav-label" id="txn-month-label">—</div>
-      <button class="mnav-btn" onclick="shiftMonth(1)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg></button>
+      <button class="mnav-btn" aria-label="Tháng sau" onclick="shiftMonth(1)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg></button>
     </div>
-    <div class="txn-kpi3">
-      <div class="tk3"><div class="tk3-lbl">Thu đã ghi</div><div class="tk3-val green" id="txn-kpi-in">—</div></div>
-      <div class="tk3-sep"></div>
-      <div class="tk3"><div class="tk3-lbl">Chi đã ghi</div><div class="tk3-val red" id="txn-kpi-out">—</div></div>
-      <div class="tk3-sep"></div>
-      <div class="tk3"><div class="tk3-lbl">Chênh lệch</div><div class="tk3-val" id="txn-kpi-remain">—</div></div>
-    </div>
-    <div class="sec-hdr"><span>Giao dịch gần đây</span><div style="display:flex;gap:8px"><span class="sec-see-all" onclick="shareTxnReport()">📤 Gửi báo cáo</span><span class="sec-see-all" onclick="showAllTxns()">Xem tất cả</span></div></div>
+    <span id="txn-kpi-in" hidden></span><span id="txn-kpi-out" hidden></span><span id="txn-kpi-remain" hidden></span>
+    <div class="sec-hdr"><span>Các khoản đã ghi</span><div style="display:flex;gap:8px"><span class="sec-see-all" onclick="showAllTxns()">Xem tất cả</span></div></div>
     <div style="padding:0 16px 10px;display:flex;gap:8px;align-items:center">
       <input id="txn-search" type="text" placeholder="🔍 Tìm giao dịch..."
         oninput="window.filterTxnSearch()"
@@ -194,11 +190,11 @@
     <div class="add-row" onclick="openSavingModal()">＋ Thêm ghi chú tiết kiệm</div>
     <div class="sett-sec-lbl">Công cụ tài chính</div>
     <div class="sett-list">
-      <div class="sett-row" onclick="switchPage('tool-loanbook')"><div class="tool-ico sr-ico" style="background:rgba(255,179,71,.15);border-radius:12px;font-size:18px;width:36px;height:36px;display:flex;align-items:center;justify-content:center">📒</div><div style="flex:1"><div class="sr-lbl">Khoản cho vay</div><div style="font-size:11px;color:var(--sub);font-weight:600">Theo dõi người vay và tình trạng thu hồi</div></div><svg class="sr-chev" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></div>
-      <div class="sett-row" onclick="switchPage('tool-interest')"><div class="tool-ico sr-ico" style="background:rgba(87,200,255,.15);border-radius:12px;font-size:18px;width:36px;height:36px;display:flex;align-items:center;justify-content:center">🧮</div><div style="flex:1"><div class="sr-lbl">Tính lãi vay</div><div style="font-size:11px;color:var(--sub);font-weight:600">Ước tính lịch trả gốc và lãi</div></div><svg class="sr-chev" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></div>
-      <div class="sett-row" onclick="switchPage('tool-saving-calc')"><div class="tool-ico sr-ico" style="background:rgba(87,255,179,.15);border-radius:12px;font-size:18px;width:36px;height:36px;display:flex;align-items:center;justify-content:center">📈</div><div style="flex:1"><div class="sr-lbl">Lãi kép tiết kiệm</div><div style="font-size:11px;color:var(--sub);font-weight:600">Ước tính số tiền cần gửi mỗi tháng</div></div><svg class="sr-chev" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></div>
-      <div class="sett-row" onclick="switchPage('tool-schedule')"><div class="tool-ico sr-ico" style="background:rgba(200,255,87,.15);border-radius:12px;font-size:18px;width:36px;height:36px;display:flex;align-items:center;justify-content:center">📅</div><div style="flex:1"><div class="sr-lbl">Lịch đến hạn</div><div style="font-size:11px;color:var(--sub);font-weight:600">Ngày thanh toán các khoản nợ</div></div><svg class="sr-chev" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></div>
-      <div class="sett-row" onclick="switchPage('tool-analyze')"><div class="tool-ico sr-ico" style="background:rgba(197,123,255,.15);border-radius:12px;font-size:18px;width:36px;height:36px;display:flex;align-items:center;justify-content:center">💡</div><div style="flex:1"><div class="sr-lbl">Cân đối thu chi</div><div style="font-size:11px;color:var(--sub);font-weight:600">So sánh kế hoạch với thu chi đã ghi</div></div><svg class="sr-chev" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></div>
+      <div class="sett-row" onclick="switchPage('tool-loanbook')"><div class="tool-ico sr-ico" style="background:rgba(255,179,71,.15);border-radius:12px;font-size:18px;width:36px;height:36px;display:flex;align-items:center;justify-content:center"><svg class="ui-symbol" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h14v18H5z M8 7h8 M8 11h8 M8 15h5"/></svg></div><div style="flex:1"><div class="sr-lbl">Khoản cho vay</div><div style="font-size:11px;color:var(--sub);font-weight:600">Theo dõi người vay và tình trạng thu hồi</div></div><svg class="sr-chev" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></div>
+      <div class="sett-row" onclick="switchPage('tool-interest')"><div class="tool-ico sr-ico" style="background:rgba(87,200,255,.15);border-radius:12px;font-size:18px;width:36px;height:36px;display:flex;align-items:center;justify-content:center"><svg class="ui-symbol" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h14v18H5z M8 7h8 M8 11h1 M12 11h1 M16 11h1 M8 15h1 M12 15h1 M16 15h1"/></svg></div><div style="flex:1"><div class="sr-lbl">Tính lãi vay</div><div style="font-size:11px;color:var(--sub);font-weight:600">Ước tính lịch trả gốc và lãi</div></div><svg class="sr-chev" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></div>
+      <div class="sett-row" onclick="switchPage('tool-saving-calc')"><div class="tool-ico sr-ico" style="background:rgba(87,255,179,.15);border-radius:12px;font-size:18px;width:36px;height:36px;display:flex;align-items:center;justify-content:center"><svg class="ui-symbol" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3v17h17 M7 15l5-5 4 3 5-7"/></svg></div><div style="flex:1"><div class="sr-lbl">Lãi kép tiết kiệm</div><div style="font-size:11px;color:var(--sub);font-weight:600">Ước tính số tiền cần gửi mỗi tháng</div></div><svg class="sr-chev" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></div>
+      <div class="sett-row" onclick="switchPage('tool-schedule')"><div class="tool-ico sr-ico" style="background:rgba(200,255,87,.15);border-radius:12px;font-size:18px;width:36px;height:36px;display:flex;align-items:center;justify-content:center"><svg class="ui-symbol" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v16H4z M8 3v4 M16 3v4 M4 10h16"/></svg></div><div style="flex:1"><div class="sr-lbl">Lịch đến hạn</div><div style="font-size:11px;color:var(--sub);font-weight:600">Ngày thanh toán các khoản nợ</div></div><svg class="sr-chev" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></div>
+      <div class="sett-row" onclick="switchPage('tool-analyze')"><div class="tool-ico sr-ico" style="background:rgba(197,123,255,.15);border-radius:12px;font-size:18px;width:36px;height:36px;display:flex;align-items:center;justify-content:center"><svg class="ui-symbol" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6 M9 21h6 M8 14a7 7 0 1 1 8 0l-1 2H9z"/></svg></div><div style="flex:1"><div class="sr-lbl">Cân đối thu chi</div><div style="font-size:11px;color:var(--sub);font-weight:600">So sánh kế hoạch với thu chi đã ghi</div></div><svg class="sr-chev" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></div>
     </div>
     <div style="height:8px"></div>
   </div>
@@ -206,7 +202,7 @@
 
 <!-- TOOL PAGES -->
 <div class="page" id="page-tool-loanbook">
-  <div class="page-header"><button class="icon-btn" onclick="switchPage('report')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg></button><div class="ph-title" style="margin-left:8px">📒 Khoản cho vay</div></div>
+  <div class="page-header"><button class="icon-btn" onclick="switchPage('report')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg></button><div class="ph-title" style="margin-left:8px"><svg class="ui-symbol" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h14v18H5z M8 7h8 M8 11h8 M8 15h5"/></svg> Khoản cho vay</div></div>
   <div class="scroll"><div style="padding:0 16px">
     <p class="notebook-hint">Theo dõi các khoản bạn cho vay. Khi giải ngân hoặc nhận lại tiền, ghi khoản chi hoặc thu tương ứng trong Thu chi.</p><div id="loanbook-list"></div>
     <div class="add-row" onclick="openLoanBookModal()" style="margin-left:0;margin-right:0">＋ Thêm khoản cho vay</div>
@@ -214,7 +210,7 @@
 </div>
 
 <div class="page" id="page-tool-interest">
-  <div class="page-header"><button class="icon-btn" onclick="switchPage('report')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg></button><div class="ph-title" style="margin-left:8px">🧮 Tính lãi vay</div></div>
+  <div class="page-header"><button class="icon-btn" onclick="switchPage('report')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg></button><div class="ph-title" style="margin-left:8px"><svg class="ui-symbol" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h14v18H5z M8 7h8 M8 11h1 M12 11h1 M16 11h1 M8 15h1 M12 15h1 M16 15h1"/></svg> Tính lãi vay</div></div>
   <div class="scroll"><div style="padding:0 16px">
     <div class="fg" style="margin-top:16px"><label>Phương pháp</label><select id="ti-method" class="fg-sel"><option value="reducing_balance">Dư nợ giảm dần (trả đều)</option><option value="fixed_principal">Gốc cố định (lãi giảm dần)</option></select></div>
     <div class="fg"><label>Số tiền vay (đ)</label><input id="ti-principal" type="text" inputmode="numeric" oninput="fmtInput(this)" placeholder="Ví dụ: 50.000.000"></div>
@@ -226,7 +222,7 @@
 </div>
 
 <div class="page" id="page-tool-saving-calc">
-  <div class="page-header"><button class="icon-btn" onclick="switchPage('report')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg></button><div class="ph-title" style="margin-left:8px">📈 Lãi kép tiết kiệm</div></div>
+  <div class="page-header"><button class="icon-btn" onclick="switchPage('report')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg></button><div class="ph-title" style="margin-left:8px"><svg class="ui-symbol" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3v17h17 M7 15l5-5 4 3 5-7"/></svg> Lãi kép tiết kiệm</div></div>
   <div class="scroll"><div style="padding:0 16px">
     <div class="fg" style="margin-top:16px"><label>Mục tiêu (đ)</label><input id="sc-goal" type="text" inputmode="numeric" oninput="fmtInput(this)" placeholder="Ví dụ: 100.000.000"></div>
     <div class="fg"><label>Lãi suất (%/năm)</label><input id="sc-rate" type="number" inputmode="decimal" placeholder="Ví dụ: 6"></div>
@@ -237,12 +233,12 @@
 </div>
 
 <div class="page" id="page-tool-schedule">
-  <div class="page-header"><button class="icon-btn" onclick="switchPage('report')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg></button><div class="ph-title" style="margin-left:8px">📅 Lịch đến hạn</div></div>
+  <div class="page-header"><button class="icon-btn" onclick="switchPage('report')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg></button><div class="ph-title" style="margin-left:8px"><svg class="ui-symbol" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v16H4z M8 3v4 M16 3v4 M4 10h16"/></svg> Lịch đến hạn</div></div>
   <div class="scroll"><div style="padding:0 16px" id="schedule-list"></div><div style="height:8px"></div></div>
 </div>
 
 <div class="page" id="page-tool-analyze">
-  <div class="page-header"><button class="icon-btn" onclick="switchPage('report')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg></button><div class="ph-title" style="margin-left:8px">💡 Cân đối thu chi</div></div>
+  <div class="page-header"><button class="icon-btn" onclick="switchPage('report')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg></button><div class="ph-title" style="margin-left:8px"><svg class="ui-symbol" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6 M9 21h6 M8 14a7 7 0 1 1 8 0l-1 2H9z"/></svg> Cân đối thu chi</div></div>
   <div class="scroll"><div style="padding:0 16px" id="analyze-content"></div><div style="height:8px"></div></div>
 </div>
 
@@ -263,7 +259,7 @@
       <svg class="sr-chev" id="arr-acc-account" viewBox="0 0 24 24" style="transition:transform .25s"><path d="M9 18l6-6-6-6"/></svg>
     </div>
 
-    <div class="sett-sec-lbl">Tự động theo lịch</div><div class="sett-list"><div class="sett-row"><span class="sr-lbl">Ghi thu, chi và trả nợ<small class="automation-help">Theo ngày đã đặt; có thể hoàn tác từng khoản.</small></span><label class="tog"><input id="automation-toggle" type="checkbox" onchange="toggleAutomation(this.checked)" aria-label="Tự động ghi nhận theo lịch"><span class="tog-sl"></span></label></div></div><div class="sett-sec-lbl">Quản lý</div><div class="sett-list"><button class="sett-row management-link" onclick="switchPage('finance')"><span class="sr-ico purple">☷</span><span class="sr-lbl">Danh mục tài chính<small>Thu cố định · Chi cố định · Thẻ · Khoản vay</small></span><span>›</span></button></div><div class="acc-body" id="body-acc-account">
+    <div class="sett-sec-lbl">Tự động theo lịch</div><div class="sett-list"><div class="sett-row"><span class="sr-lbl">Ghi thu, chi và trả nợ<small class="automation-help">Tự ghi theo ngày đã đặt. Nợ các tháng đã qua được đánh dấu hoàn thành; tháng hiện tại có thể hoàn tác.</small></span><label class="tog"><input id="automation-toggle" type="checkbox" onchange="toggleAutomation(this.checked)" aria-label="Tự động ghi nhận theo lịch"><span class="tog-sl"></span></label></div></div><p id="history-estimate-note" class="notebook-hint" hidden></p><div class="sett-sec-lbl">Quản lý</div><div class="sett-list"><button class="sett-row management-link" onclick="switchPage('finance')"><span class="sr-ico purple">☷</span><span class="sr-lbl">Danh mục tài chính<small>Thu cố định · Chi cố định · Thẻ · Khoản vay</small></span><span>›</span></button></div><div class="acc-body" id="body-acc-account">
       <div class="sett-sec-lbl">Ví &amp; dữ liệu</div>
       <div class="sett-list"><div class="sett-row" onclick="openBalanceBook()"><div class="sr-ico purple">◈</div><span class="sr-lbl">Số dư và lịch sử cập nhật</span><span class="sr-chev">›</span></div><div class="sett-row" onclick="exportJSON()"><div class="sr-ico blue">↓</div><span class="sr-lbl">Tải bản sao dữ liệu (JSON)</span><span class="sr-chev">›</span></div><div class="sett-row" onclick="exportCSV()"><div class="sr-ico teal">↗</div><span class="sr-lbl">Tải bảng thu chi (CSV)</span><span class="sr-chev">›</span></div></div>
       <div class="sett-list">
@@ -354,9 +350,9 @@
     </div>
   </div>
 </div>
-<div class="modal-bg" id="modal-txn" onclick="closeMBg('modal-txn',event)"><div class="msheet"><div class="mhandle"></div><div class="mtitle" id="txn-modal-title">Ghi giao dịch</div><div class="type-toggle"><div class="tt-btn" id="tt-in" onclick="setTxnType('in')">📈 Thu nhập</div><div class="tt-btn active-out" id="tt-out" onclick="setTxnType('out')">📉 Chi tiêu</div></div><div class="fg" id="txn-plan-field"><label for="txn-plan">Khoản đã dự tính (nếu có)</label><select id="txn-plan" class="fg-sel" onchange="chooseTxnPlan()"></select></div><div class="suggest-wrap" id="txn-chips"></div><div class="fg"><label>Ngày giao dịch</label><input id="txn-date" type="date" class="fg-sel" style="color-scheme:dark"></div><div class="fg"><label>Nội dung</label><input id="txn-name" type="text" placeholder="Ví dụ: Thưởng dự án"></div><div class="fg"><label>Số tiền (đ)</label><input id="txn-amount" type="text" inputmode="numeric" oninput="fmtInput(this)" placeholder="Ví dụ: 500.000"></div><div class="mbtns"><button class="mbtn mbtn-cancel" onclick="closeModal('modal-txn')">Huỷ</button><button class="mbtn mbtn-del" id="txn-del" onclick="deleteTxn()">Xoá</button><button class="mbtn mbtn-save" onclick="saveTxn()">Lưu</button></div></div></div>
+<div class="modal-bg" id="modal-txn" onclick="closeMBg('modal-txn',event)"><div class="msheet"><div class="mhandle"></div><div class="mtitle" id="txn-modal-title">Ghi giao dịch</div><div class="type-toggle"><div class="tt-btn" id="tt-in" onclick="setTxnType('in')"><svg class="ui-symbol" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3v17h17 M7 15l5-5 4 3 5-7"/></svg> Thu nhập</div><div class="tt-btn active-out" id="tt-out" onclick="setTxnType('out')">📉 Chi tiêu</div></div><div class="fg" id="txn-plan-field"><label for="txn-plan">Khoản đã dự tính (nếu có)</label><select id="txn-plan" class="fg-sel" onchange="chooseTxnPlan()"></select></div><div class="suggest-wrap" id="txn-chips"></div><div class="fg"><label>Ngày giao dịch</label><input id="txn-date" type="date" class="fg-sel" style="color-scheme:dark"></div><div class="fg"><label>Nội dung</label><input id="txn-name" type="text" placeholder="Ví dụ: Thưởng dự án"></div><div class="fg"><label>Số tiền (đ)</label><input id="txn-amount" type="text" inputmode="numeric" oninput="fmtInput(this)" placeholder="Ví dụ: 500.000"></div><div class="mbtns"><button class="mbtn mbtn-cancel" onclick="closeModal('modal-txn')">Huỷ</button><button class="mbtn mbtn-del" id="txn-del" onclick="deleteTxn()">Xoá</button><button class="mbtn mbtn-save" onclick="saveTxn()">Lưu</button></div></div></div>
 
-<div class="modal-bg" id="modal-saving" onclick="closeMBg('modal-saving',event)"><div class="msheet"><div class="mhandle"></div><div class="mtitle">Ghi chú tiết kiệm</div><p class="notebook-hint">Dành cho mục tiêu hoặc số tiền bạn đã để riêng. Xem số dư thực tế trên card chính.</p><div class="fg"><label for="sv-date">Ngày ghi chú</label><input id="sv-date" type="date"></div><div class="fg"><label>Ghi chú</label><input id="sv-name" type="text" placeholder="Ví dụ: Tiết kiệm tháng 6"></div><div class="fg"><label>Số tiền (đ)</label><input id="sv-amount" type="text" inputmode="numeric" oninput="fmtInput(this)" placeholder="Ví dụ: 1.000.000"></div><div class="mbtns"><button class="mbtn mbtn-cancel" onclick="closeModal('modal-saving')">Huỷ</button><button class="mbtn mbtn-save" onclick="saveSaving()">Lưu</button></div></div></div>
+<div class="modal-bg" id="modal-saving" onclick="closeMBg('modal-saving',event)"><div class="msheet"><div class="mhandle"></div><div class="mtitle">Ghi chú tiết kiệm</div><p class="notebook-hint">Dành cho mục tiêu hoặc số tiền bạn đã để riêng. Theo dõi số tiền hiện có tại mục Tiền trong ví.</p><div class="fg"><label for="sv-date">Ngày ghi chú</label><input id="sv-date" type="date"></div><div class="fg"><label>Ghi chú</label><input id="sv-name" type="text" placeholder="Ví dụ: Tiết kiệm tháng 6"></div><div class="fg"><label>Số tiền (đ)</label><input id="sv-amount" type="text" inputmode="numeric" oninput="fmtInput(this)" placeholder="Ví dụ: 1.000.000"></div><div class="mbtns"><button class="mbtn mbtn-cancel" onclick="closeModal('modal-saving')">Huỷ</button><button class="mbtn mbtn-save" onclick="saveSaving()">Lưu</button></div></div></div>
 
 <div class="modal-bg" id="modal-share-qr" onclick="closeMBg('modal-share-qr',event)"><div class="msheet"><div class="mhandle"></div>
   <div class="mtitle">Chia sẻ ứng dụng</div>

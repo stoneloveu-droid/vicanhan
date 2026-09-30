@@ -141,7 +141,6 @@ export function renderHome(state){
   set('hero-paid-planned',walletHidden?'••••••':fmt(summary.paidPlanned));
   set('hero-balance',walletHidden?'••••••':fmt(balanceSummary(state.balanceNotes,state.walletBase,state.txns).total));
   set('wallet-balance-status',state.automation?.enabled?'Theo lịch & ghi chép':'Theo ghi chép');
-  set('hero-month-income',walletHidden?'••••••':fmt(summary.expectedIncome));
   const remainingList=document.getElementById('remaining-items');
   if(remainingList){
     remainingList.replaceChildren();
@@ -155,7 +154,7 @@ export function renderHome(state){
   set('hero-reserved',walletHidden?'••••••':fmt(summary.reserved));
   set('wallet-status',summary.monthlyBudget<0?'Thu dự kiến chưa đủ cho chi phí tháng này.':'Thu dự kiến trừ toàn bộ chi phí của tháng.');
   document.getElementById('kpi-wallet').style.color=summary.monthlyBudget<0?'var(--red)':'';
-  set('hero-breakdown',walletHidden?'Xem các khoản còn phải chi':'Chưa trả: Nợ '+fmt(summary.unpaidDebt)+' · Chi khác '+fmt(summary.remainingExpense));
+  set('hero-breakdown',walletHidden?'Xem các khoản còn phải chi':summary.reserved===0?'Đã hoàn thành các khoản chi tháng này':'Chưa trả: Nợ '+fmt(summary.unpaidDebt)+' · Chi khác '+fmt(summary.remainingExpense));
   set('home-saving-notes',walletHidden?'••••••':fmt(summary.savingTotal));
   set('home-debt-left',walletHidden?'••••••':fmt(summary.debtLeft));set('home-unpaid',walletHidden?'••••••':fmt(summary.unpaidDebt));
   set('kpi-income-mini',walletHidden?'••••••':fmt(summary.totalIn));set('kpi-expense-mini',walletHidden?'••••••':fmt(summary.totalOut));
@@ -184,7 +183,7 @@ export function renderPaid(state){
  if(el('prog-paid-amt')) el('prog-paid-amt').textContent=fmt(paidAmt);
  if(el('prog-total-amt')) el('prog-total-amt').textContent=fmt(totalPay);
  if(el('kpi-debt-total')) el('kpi-debt-total').textContent=fmt(summary.debtLeft);
- if(el('debt-month-label')) el('debt-month-label').textContent=getML(currentMonth);
+ if(el('debt-month-label')) el('debt-month-label').textContent='Tháng hiện tại · '+getML(currentMonth);
  if(el('ps-total-debt')) el('ps-total-debt').textContent=fmt(totalPay);
   if(el('ps-paid'))       el('ps-paid').textContent=fmt(paidAmt);
   if(el('ps-unpaid-amt')) el('ps-unpaid-amt').textContent=fmt(totalPay-paidAmt);
@@ -318,7 +317,7 @@ export function renderSavingList(savings){
     const row=document.createElement('div');row.className='save-row';
     row.innerHTML=`<div class="save-row-left" role="button" tabindex="0" onclick="openSavingModal('${s.id}')"><div class="save-row-name">${escapeHTML(s.name)}</div><div class="save-row-date">${escapeHTML(s.date||'')}</div></div>
       <div style="display:flex;align-items:center;gap:8px"><div class="save-row-amt">${fmt(s.amount)}</div>
-      <button class="s-del" onclick="window.deleteSaving('${s.id}')">✕</button></div>`;
+      <button class="s-del" aria-label="Xoá ghi chú tiết kiệm" onclick="window.deleteSaving('${s.id}')">✕</button></div>`;
     el.appendChild(row);
   });
   const total=savings.reduce((s,x)=>s+Number(x.amount),0);
@@ -327,6 +326,9 @@ export function renderSavingList(savings){
 
 // ── RENDER SETTINGS ───────────────────────────────────────────
 export function renderSettings(state){
+ const historyNote=document.getElementById('history-estimate-note');
+ if(historyNote){const estimated=Object.values(state.txns||{}).flat().some(t=>t.estimated);historyNote.hidden=!estimated;historyNote.textContent='Các kỳ nợ bổ sung cho tháng trước được ước tính theo thông tin khoản vay hiện có. Kiểm tra ngày bắt đầu, lãi suất và số kỳ đã trả trong Danh mục tài chính.';}
+
  const {debts,income,expense,savings,txns,currentMonth,currentTheme}=state;
  const s=monthSummary(state);
  const autoToggle=document.getElementById('automation-toggle');if(autoToggle)autoToggle.checked=!!state.automation?.enabled;
@@ -470,17 +472,22 @@ export function renderAnalyze(state){
 }
 
 // ── RENDER REPORT ─────────────────────────────────────────────
-let donutChart=null;
+const reportCharts={};
 
 
 export function renderReport(state){
-  const s=monthSummary(state),set=(id,value)=>{const el=document.getElementById(id);if(el)el.textContent=value;};
+  const s=monthSummary(state),set=(id,value)=>{const el=document.getElementById(id);if(el)el.textContent=state.walletHidden&&id!=='rpt-title'?'••••••':value;};
   set('rpt-title','Sổ thu chi · '+getML(state.currentMonth));
   set('rpt-income',fmt(s.totalIn));set('rpt-expense',fmt(s.totalOut));
-  set('rpt-expense-fixed',fmt(s.plannedExpense));set('rpt-expense-extra',fmt(s.fixedIncome));
+  set('rpt-expense-fixed',fmt(s.expectedExpense));set('rpt-expense-extra',fmt(s.expectedIncome));
   set('rpt-debt-pay',fmt(s.paidDebt));set('rpt-saving',fmt(s.net));
   const remain=document.getElementById('rpt-saving');if(remain)remain.style.color=s.net>=0?'var(--purple)':'var(--red)';
-  renderDonutChart(0,s.entries);
+  for(const card of document.querySelectorAll('#monthly-report .report-card'))card.hidden=state.walletHidden;
+  const notice=document.getElementById('report-privacy');if(notice)notice.hidden=!state.walletHidden;
+  if(state.walletHidden){for(const chart of Object.values(reportCharts))chart.destroy();for(const key of Object.keys(reportCharts))delete reportCharts[key];document.getElementById('report-groups')?.replaceChildren();return;}
+  renderDonutChart('out',s.entries);
+  renderDonutChart('in',s.entries);
+  renderReportGroups(s.entries);
 }
 const CAT_GROUPS=[
   {label:'Ăn uống',   color:'#4CAF50', match:/ăn|food|cơm|phở|nhà hàng|cafe/i},
@@ -493,29 +500,27 @@ function categorize(name){
   return CAT_GROUPS.find(c=>c.match.test(name))||CAT_GROUPS[CAT_GROUPS.length-1];
 }
 
-function renderDonutChart(fixedExpense, monthTxns){
+function renderDonutChart(type, monthTxns){
+  const prefix=type==='in'?'income':'donut';
   const el=id=>document.getElementById(id);
-  const outTxns=monthTxns.filter(t=>t.type==='out');
+  const outTxns=monthTxns.filter(t=>t.type===type);
   const cats={};
   outTxns.forEach(t=>{
-    const c=t.debtId?{label:'Trả nợ',color:'#57C8FF'}:categorize(t.name);
+    const c=reportCategory(t);
     cats[c.label]=(cats[c.label]||{label:c.label,color:c.color,amount:0});
     cats[c.label].amount+=Number(t.amount);
   });
-  if(fixedExpense>0){
-    cats['Chi cố định']=(cats['Chi cố định']||{label:'Chi cố định',color:'#2196F3',amount:0});
-    cats['Chi cố định'].amount+=fixedExpense;
-  }
+
   const data=Object.values(cats).filter(c=>c.amount>0);
   const total=data.reduce((s,c)=>s+c.amount,0);
-  if(el('donut-total')) el('donut-total').textContent=fmt(total);
+  if(el(prefix+'-total')) el(prefix+'-total').textContent=fmt(total);
 
-  const canvas=el('donut-chart');
+  const canvas=el(prefix+'-chart');
   if(!canvas) return;
-  const legend=el('donut-legend');
+  const legend=el(prefix+'-legend');
   if(legend){
     legend.innerHTML='';
-    if(!data.length) legend.textContent='Chưa có chi tiêu trong tháng này.';
+    if(!data.length) legend.textContent='Chưa có khoản '+(type==='in'?'thu':'chi')+' trong tháng này.';
  data.forEach(c=>{
       const pct=Math.round(c.amount/(total||1)*100);
       const row=document.createElement('div');row.className='dl-row';
@@ -527,8 +532,27 @@ function renderDonutChart(fixedExpense, monthTxns){
     });
   }
   if(typeof Chart==='undefined') return;
- const chartData={labels:data.length?data.map(c=>c.label):['Chưa có chi tiêu'],datasets:[{data:data.length?data.map(c=>c.amount):[1],backgroundColor:data.length?data.map(c=>c.color):['#29273b'],borderWidth:0,hoverOffset:5,borderRadius:5,spacing:3}]};
- if(donutChart){donutChart.data=chartData;donutChart.update();return;}
- donutChart=new Chart(canvas,{type:'doughnut',data:chartData,options:{cutout:'78%',plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.label+': '+fmt(ctx.label==='Chưa có chi tiêu'?0:ctx.raw)}}},animation:{duration:matchMedia('(prefers-reduced-motion: reduce)').matches?0:650}}});
+ const chartData={labels:data.length?data.map(c=>c.label):['Chưa có dữ liệu'],datasets:[{data:data.length?data.map(c=>c.amount):[1],backgroundColor:data.length?data.map(c=>c.color):['#29273b'],borderWidth:0,hoverOffset:5,borderRadius:5,spacing:3}]};
+ if(reportCharts[type]){reportCharts[type].data=chartData;reportCharts[type].update();return;}
+ reportCharts[type]=new Chart(canvas,{type:'doughnut',data:chartData,options:{cutout:'78%',plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.label+': '+fmt(ctx.label==='Chưa có dữ liệu'?0:ctx.raw)}}},animation:{duration:matchMedia('(prefers-reduced-motion: reduce)').matches?0:650}}});
 
+}
+
+function reportCategory(t){
+ if(t.type==='in')return t.planId?{label:'Thu cố định',color:'#4CAF50'}:{label:'Thu phát sinh',color:'#57C8FF'};
+ return t.debtId?{label:'Trả nợ',color:'#57C8FF'}:t.planId?{label:'Chi cố định',color:'#FF9800'}:categorize(t.name);
+}
+function renderReportGroups(entries){
+ const root=document.getElementById('report-groups');if(!root)return;root.replaceChildren();
+ for(const type of ['in','out']){
+  const groups=new Map();
+  for(const t of entries.filter(t=>t.type===type)){const name=reportCategory(t).label;if(!groups.has(name))groups.set(name,[]);groups.get(name).push(t);}
+  for(const [name,items] of groups){
+   const details=document.createElement('details'),heading=document.createElement('summary');details.className='report-group';
+   heading.textContent=(type==='in'?'Thu · ':'Chi · ')+name+' · '+fmt(items.reduce((v,t)=>v+Number(t.amount),0));details.append(heading);
+   for(const t of items.slice().sort((a,b)=>(b.date||'').localeCompare(a.date||''))){const row=document.createElement('div'),label=document.createElement('span'),value=document.createElement('strong');row.className='remaining-row';label.textContent=(t.date?t.date.slice(8)+'/'+t.date.slice(5,7)+' · ':'')+t.name+(t.estimated?' · Ước tính':t.automatic?' · Theo lịch':'');value.textContent=fmt(t.amount);row.append(label,value);details.append(row);}
+   root.append(details);
+  }
+ }
+ if(!root.children.length)root.textContent='Chưa có thu chi trong tháng này.';
 }

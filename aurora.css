@@ -282,3 +282,19 @@ html[data-motion=off] *,html[data-motion=off] *:before,html[data-motion=off] *:a
 .wallet-balance-card>p{font-size:11px;color:var(--sub);line-height:1.6;margin:6px 0 0}
 .wallet-balance-card .wallet-actions{margin-top:12px}
 .automation-help{display:block;color:var(--sub);font-size:11px;font-weight:500;margin-top:6px;max-width:250px;line-height:1.5}
+
+.wallet-breakdown:has(> .reserved-button:only-child){grid-template-columns:1fr}.wallet-breakdown>.reserved-button:only-child{display:flex;justify-content:space-between;align-items:center;width:100%;border-left:0}.report-group{padding:12px 0;border-bottom:1px solid var(--border)}.report-group summary{cursor:pointer;font-size:13px;font-weight:800;line-height:1.6}.report-group .remaining-row{font-size:12px;gap:12px}.report-group .remaining-row span{min-width:0;overflow-wrap:anywhere}.report-group .remaining-row strong{white-space:nowrap}.debt-toolbar>span{font-size:13px;font-weight:800}
+
+/* Consistent touch targets, including icon-only controls. */
+.icon-btn,.wc-eye,.mnav-btn,.s-del,.chk{min-width:44px;min-height:44px;flex-shrink:0}
+.fin-fixed-btn,.sec-see-all,.hero-breakdown,.note-link,.save-row-left{min-height:44px;display:inline-flex;align-items:center}
+.save-row-left{flex-direction:column;align-items:flex-start;justify-content:center}
+button,[role="button"],summary{touch-action:manipulation}
+button:focus-visible,[role="button"]:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+button:active:not(:disabled),[role="button"]:active{filter:brightness(.85)}
+button:disabled{opacity:.45;cursor:default}
+[hidden]{display:none!important}
+
+.ui-symbol{display:inline-block;width:20px;height:20px;vertical-align:-4px;flex-shrink:0}.ph-title .ui-symbol{margin-right:4px}
+
+#page-home .wc-eye{min-width:44px;min-height:44px}

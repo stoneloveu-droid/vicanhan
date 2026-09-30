@@ -244,3 +244,30 @@ test('scheduled catch-up is idempotent, advances loans, clamps dates and honors 
  const p=applySchedule(partial,'2026-01-31');assert.equal(p.txns['2026-01'].find(t=>t.scheduleKey===scheduleKey('2026-01','expense','rent')).amount,60);
  assert.deepEqual(applySchedule({...s,automation:{enabled:false}},'2026-03-31'),{...s,automation:{enabled:false}});
 });
+
+test('debt history fills before automation without charging previously paid terms again',async()=>{
+ const {applySchedule}=await import('../schedule.js');
+ const input={automation:{enabled:true,fromMonth:'2026-04',skips:{}},debts:[{id:'a',name:'Vay',type:'tc',principal:600,rate:0,totalTerm:6,curTerm:2,startMonth:'2026-01',payDay:30}],income:[],expense:[],ticks:{},txns:{}};
+ const result=applySchedule(input,'2026-04-01');
+ assert.equal(result.debts[0].curTerm,3);
+ assert.deepEqual(Object.keys(result.ticks).filter(m=>result.ticks[m].a),['2026-01','2026-02','2026-03']);
+ assert.equal(result.txns['2026-01'][0].accountId,'');
+ assert.equal(result.txns['2026-03'][0].accountId,'main');
+ assert.deepEqual(applySchedule(result,'2026-04-01'),result);
+ assert.equal(input.debts[0].curTerm,2);
+});
+test('past debt overrides expire, current undo remains, paid-off history is retained',async()=>{
+ const {applySchedule,scheduleKey}=await import('../schedule.js');
+ const input={automation:{enabled:true,fromMonth:'2026-01',skips:{[scheduleKey('2026-01','debt','a')]:true,[scheduleKey('2026-02','debt','a')]:true}},debts:[{id:'a',name:'Vay',type:'tc',principal:300,rate:0,totalTerm:3,curTerm:0,payDay:1}],income:[],expense:[],ticks:{},txns:{}};
+ const result=applySchedule(input,'2026-02-15');assert(result.ticks['2026-01'].a);assert(!result.ticks['2026-02'].a);assert.equal(result.debts[0].curTerm,1);
+ const settled=applySchedule({...input,automation:{enabled:true,fromMonth:'2026-04',skips:{}},debts:[{...input.debts[0],startMonth:'2026-01',curTerm:3,settled:true}]},'2026-04-15');
+ assert.equal(settled.debts[0].curTerm,3);assert.equal(Object.values(settled.ticks).filter(m=>m.a).length,3);assert.deepEqual(applySchedule(settled,'2026-04-15'),settled);
+});
+
+test('backfilled amounts are estimates and later rate edits preserve recorded history',async()=>{
+ const {applySchedule}=await import('../schedule.js');
+ const s={automation:{enabled:true,fromMonth:'2026-04',skips:{}},debts:[{id:'a',name:'Vay',type:'tc',principal:600,rate:12,totalTerm:6,curTerm:3,startMonth:'2026-01',payDay:30}],income:[],expense:[],ticks:{},txns:{}};
+ const filled=applySchedule(s,'2026-04-01');assert(filled.txns['2026-01'][0].estimated);assert(filled.ticks['2026-01'].a.estimated);
+ const edited=structuredClone(filled);edited.debts[0].rate=24;
+ const result=applySchedule(edited,'2026-04-01');assert.deepEqual(result.txns,filled.txns);assert.deepEqual(result.ticks,filled.ticks);assert.equal(result.debts[0].curTerm,3);
+});

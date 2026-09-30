@@ -75,7 +75,7 @@ function startRealtimeSync(){
     baseline=clone(persisted());loaded=true;
     setSyncBadge('synced','Đã đồng bộ');renderAll();
     if(!snap.exists()&&!window._onboardingDone) openOnboarding();
-    if(snap.exists()&&automation?.enabled&&snap.data()?.automation?.lastRun!==localDate())saveToFirestore().catch(e=>showToast(e.message));
+    if(snap.exists()&&automation?.enabled&&(snap.data()?.automation?.lastRun!==localDate()||snap.data()?.automation?.debtHistoryVersion!==2))saveToFirestore().catch(e=>showToast(e.message));
   },(e)=>{setSyncBadge('error','Không thể tải dữ liệu');showToast('Không thể tải dữ liệu. Kiểm tra kết nối rồi thử lại.');console.error(e);});
 }
 async function saveToFirestore(){
@@ -292,6 +292,7 @@ function renderAll(){
 // ── SWITCH PAGE ───────────────────────────────────────────────
 window.switchPage=function(name){
   if(!document.getElementById('page-'+name)) return;
+  if(name==='paid'){if(currentMonth!==localDate().slice(0,7))showToast('Đang mở các khoản nợ của tháng hiện tại');currentMonth=localDate().slice(0,7);syncMonthForPicker();}
   currentPage = name;document.body.dataset.page=name;
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.ni').forEach(b=>b.classList.remove('active'));
@@ -388,6 +389,7 @@ window.shiftMonth=function(delta){
   showAllTxnsFlag=false;
   renderAll();
 };
+window.showMonthlyReport=function(){const el=document.getElementById('monthly-report');el.open=true;renderReport(getState());el.scrollIntoView({behavior:'smooth',block:'start'});};
 window.showRemainingExpenses=function(){const el=document.getElementById('remaining-details');el.open=true;el.scrollIntoView({behavior:'smooth',block:'center'});};
 window.openMonthPickerApp=function(){
   window.openMonthPicker(currentMonth);
@@ -677,7 +679,7 @@ function validNoteDate(value){
   const d=new Date(value+'T12:00:00');
   return Number.isFinite(d.getTime())&&localDate(d)===value;
 }
-window.toggleWalletVis=function(){walletHidden=!walletHidden;renderHome(getState());document.getElementById('wallet-eye')?.setAttribute('aria-label',walletHidden?'Hiện số tiền':'Ẩn số tiền');};
+window.toggleWalletVis=function(){walletHidden=!walletHidden;renderHome(getState());renderReport(getState());document.getElementById('wallet-eye')?.setAttribute('aria-label',walletHidden?'Hiện số tiền':'Ẩn số tiền');};
 window.openSavingModal=function(id){
   editSavingId=id||null;
   const entry=savings.find(x=>x.id===editSavingId);

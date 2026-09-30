@@ -17,6 +17,7 @@ if(new URLSearchParams(location.search).has('paid-legacy')){
  data.ticks={[month]:{'demo-card':{amount:650000},'demo-loan':{amount:2950000}}};
 }
 
+if(data)data.automation={enabled:new URLSearchParams(location.search).has('auto'),fromMonth:month,skips:{}};
 let listener;const snapshot=()=>({exists:()=>!!data,data:()=>clone(data)});
 export const auth={currentUser:{uid:'preview-only',displayName:'Ví trải nghiệm',email:'Dữ liệu mẫu · Không kết nối Firebase',isAnonymous:false}};
 export const db={};export const doc=()=>({});

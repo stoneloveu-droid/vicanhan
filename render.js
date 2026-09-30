@@ -1,5 +1,5 @@
 import { renderBalanceBook } from './notebook-ui.js';
-import { isDebtActive, dueDate, isRecurringPlan, monthlyEntries, planRemaining, monthSummary, paymentAmount, escapeHTML, balanceEntries, recordedEntries, localDate } from './finance.js';
+import { isDebtActive, dueDate, isRecurringPlan, monthlyEntries, planRemaining, monthSummary, paymentAmount, escapeHTML, balanceSummary, balanceEntries, recordedEntries, localDate } from './finance.js';
 // ── render.js ─────────────────────────────────────────────────
 // Tất cả hàm render UI: home, paid, cards, txn, settings,
 // tools, report, charts
@@ -134,12 +134,14 @@ export function renderHome(state){
   if(track){track.hidden=walletHidden;track.setAttribute('aria-valuenow',String(progress));}
   const fill=document.getElementById('budget-progress-fill');if(fill)fill.style.width=progress+'%';
 
-  set('kpi-wallet',walletHidden?'••••••':summary.accounts.length?fmt(summary.available):'Chưa có số dư');
+  set('kpi-wallet',walletHidden?'••••••':fmt(summary.monthlyBudget));
   set('available-amount',walletHidden?'••••••':fmt(summary.reserved));
   set('available-detail',walletHidden?'Sinh hoạt và trả nợ':'Sinh hoạt '+fmt(summary.remainingExpense)+' · Nợ '+fmt(summary.unpaidDebt));
   set('hero-planned',walletHidden?'••••••':fmt(summary.plannedExpense));
   set('hero-paid-planned',walletHidden?'••••••':fmt(summary.paidPlanned));
-  set('hero-balance',walletHidden?'••••••':fmt(summary.balanceTotal));
+  set('hero-balance',walletHidden?'••••••':fmt(balanceSummary(state.balanceNotes,state.walletBase,state.txns).total));
+  set('wallet-balance-status',state.automation?.enabled?'Theo lịch & ghi chép':'Theo ghi chép');
+  set('hero-month-income',walletHidden?'••••••':fmt(summary.expectedIncome));
   const remainingList=document.getElementById('remaining-items');
   if(remainingList){
     remainingList.replaceChildren();
@@ -151,8 +153,8 @@ export function renderHome(state){
     if(!rows.length)remainingList.textContent='Đã thanh toán đủ các khoản dự chi.';
   }
   set('hero-reserved',walletHidden?'••••••':fmt(summary.reserved));
-  set('wallet-status',!summary.accounts.length?'Cập nhật số dư để bắt đầu.':summary.available<0?'Thiếu tiền theo các khoản chưa thanh toán đã nhập.':summary.available===0?'Số dư hiện đủ cho các khoản chưa thanh toán.':'Theo số dư và các khoản chưa thanh toán bạn đã nhập.');
-  document.getElementById('kpi-wallet').style.color=summary.available<0?'var(--red)':'';
+  set('wallet-status',summary.monthlyBudget<0?'Thu dự kiến chưa đủ cho chi phí tháng này.':'Thu dự kiến trừ toàn bộ chi phí của tháng.');
+  document.getElementById('kpi-wallet').style.color=summary.monthlyBudget<0?'var(--red)':'';
   set('hero-breakdown',walletHidden?'Xem các khoản còn phải chi':'Chưa trả: Nợ '+fmt(summary.unpaidDebt)+' · Chi khác '+fmt(summary.remainingExpense));
   set('home-saving-notes',walletHidden?'••••••':fmt(summary.savingTotal));
   set('home-debt-left',walletHidden?'••••••':fmt(summary.debtLeft));set('home-unpaid',walletHidden?'••••••':fmt(summary.unpaidDebt));
@@ -327,6 +329,7 @@ export function renderSavingList(savings){
 export function renderSettings(state){
  const {debts,income,expense,savings,txns,currentMonth,currentTheme}=state;
  const s=monthSummary(state);
+ const autoToggle=document.getElementById('automation-toggle');if(autoToggle)autoToggle.checked=!!state.automation?.enabled;
  const monthlyLabel=document.getElementById('monthly-plan-label');if(monthlyLabel)monthlyLabel.textContent=getML(currentMonth);
  const planLabel=document.getElementById('plan-month-label');if(planLabel)planLabel.textContent=getML(currentMonth);
   renderFinList('income',income,s.entries,state);
@@ -460,10 +463,10 @@ export function renderAnalyze(state){
   const rows=[
     ['Dự thu cả tháng',s.fixedIncome],['Dự chi cả tháng',s.plannedExpense],
     ['Chênh lệch dự kiến',difference],['Đã thu',s.totalIn],['Đã chi',s.totalOut],
-    ['Còn phải chi',s.reserved],['Tiền hiện có',s.balanceTotal],['Ước tính có thể chi',s.available]
+    ['Còn phải chi',s.reserved],['Tiền hiện có',s.balanceTotal],['Dư tháng dự kiến',s.monthlyBudget]
   ];
   el.innerHTML=rows.map(([label,value])=>'<div class="analyze-item"><span class="analyze-key">'+label+'</span><span class="analyze-val" style="color:'+(value<0?'var(--red)':'var(--text)')+'">'+fmt(value)+'</span></div>').join('')+
-    '<p class="notebook-hint">Chênh lệch dự kiến là dự thu trừ dự chi. Ước tính có thể chi là tiền hiện có trừ các khoản còn phải chi; chưa cộng thu nhập dự kiến.</p>';
+    '<p class="notebook-hint">Dư tháng dự kiến tính riêng thu và chi của tháng. Tiền trong ví cộng dồn theo các giao dịch và lần đối chiếu số dư.</p>';
 }
 
 // ── RENDER REPORT ─────────────────────────────────────────────

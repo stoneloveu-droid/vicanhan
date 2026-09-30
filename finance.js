@@ -47,6 +47,7 @@ export function recurringForMonth({income=[],expense=[],recurringPlans={}},month
   return key?recurringPlans[key]:{income,expense};
 }
 export function isDebtActive(debt,month) {
+ if(debt.startMonth&&month<debt.startMonth)return false;
  const key=Object.keys(debt.activity||{}).filter(k=>k<=month).sort().at(-1);
  return key?debt.activity[key]!==false:true;
 }
@@ -128,7 +129,7 @@ export function monthSummary({debts=[],income=[],expense=[],ticks={},txns={},sav
   const reserved=remainingExpense+unpaidDebt;
   const plannedExpense=fixedExpense+paidDebt+unpaidDebt,paidPlanned=plannedExpense-reserved;
   const unassigned=recordedEntries(Object.values(txns).flat()).filter(t=>(!t.date||t.date<=asOf)&&!t.accountId&&t.type!=='transfer').length;
-  return {entries,plannedExpense,paidPlanned,txnIn,txnOut,totalIn:txnIn,totalOut:txnOut,net:txnIn-txnOut,fixedIncome,fixedExpense,
+  return {monthlyBudget:txnIn+remainingIncome-txnOut-reserved,expectedIncome:txnIn+remainingIncome,expectedExpense:txnOut+reserved,entries,plannedExpense,paidPlanned,txnIn,txnOut,totalIn:txnIn,totalOut:txnOut,net:txnIn-txnOut,fixedIncome,fixedExpense,
     totalDebtPay:paidDebt+unpaidDebt,paidDebt,unpaidDebt,remainingExpense,remainingIncome,reserved,
     available:balances.total-reserved,accounts:balances.accounts,unassigned,
     balanceTotal:balances.total,savingTotal:sum(savings),

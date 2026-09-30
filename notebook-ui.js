@@ -11,9 +11,11 @@ export function renderBalanceBook(notes,walletBase,hidden=false,txns={},asOf,com
       const row=document.createElement('button');row.className='balance-note-row';row.type='button';row.onclick=()=>id==='balance-accounts'?window.reconcileAccount(entry.accountId):window.openBalanceNote(entry.id);
       const info=document.createElement('span'),name=document.createElement('b'),detail=document.createElement('small'),amount=document.createElement('strong');
       name.textContent=entry.name;
+      if(entry.adjustment!==undefined)name.textContent='Đối chiếu số dư';
       detail.textContent=(entry.date?'Đối chiếu ':'')+dateLabel(entry.date);
       amount.textContent=hidden?'••••••':fmt(entry.amount);
       info.append(name,detail);
+      if(id==='balance-history'&&entry.adjustment!==undefined){const a=document.createElement('small');a.textContent='Điều chỉnh '+(entry.adjustment>=0?'+':'')+fmt(entry.adjustment);info.appendChild(a);}
       if(id==='balance-history'&&entry.note){const note=document.createElement('small');note.textContent=entry.note;info.appendChild(note);}
       row.append(info,amount);list.appendChild(row);
     }

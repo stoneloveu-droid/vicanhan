@@ -12,10 +12,10 @@
 
 ## Cách tính
 
-- Card chính là số dư duy nhất. Thu, chi và trả nợ tự động dùng số dư này; không tạo hoặc chọn tài khoản phụ. Số dư và lịch sử từ các nguồn đã nhập vẫn được giữ khi tính tổng.
-- Cập nhật số dư và xem lịch sử ngay trên card chính. Khoản thu/chi tiếp theo được cộng hoặc trừ từ mốc đối chiếu.
+- Card chính là ngân sách riêng từng tháng. Ví cộng dồn nằm ở card riêng và giữ lịch sử đã nhập.
+- Cập nhật số dư và xem lịch sử ở card Ví cộng dồn. Khoản thu/chi tiếp theo được tính từ mốc đối chiếu.
 - Còn phải chi gồm nợ chưa trả và khoản chi dự kiến chưa thanh toán. Trả hết nợ không loại bỏ tiền nhà hoặc các chi phí còn chờ.
-- Ước tính có thể chi = tiền hiện có − còn phải chi. Thu nhập chưa nhận chưa được cộng.
+- Dư tháng dự kiến = đã thu + dự thu còn lại − đã chi − dự chi còn lại. Tick/hoàn tác không trừ kế hoạch hai lần.
 - Khoản chi liên kết với nợ chỉ được dự tính một lần. Khi đọc dữ liệu, chỉ tự liên kết bản ghi trùng có mã phù hợp hoặc tên và số tiền khớp duy nhất; các trường hợp khác được liên kết trong Cài đặt.
 - Nhấn trực tiếp vào “Còn phải chi” trên card chính để xem từng khoản nợ và chi dự kiến chưa thanh toán.
 - Tiết kiệm là ghi chú riêng. Lịch sử chuyển tiền nội bộ vẫn được giữ; không tạo chuyển tiền mới.
@@ -37,3 +37,13 @@ Kế hoạch cố định dùng mốc hiệu lực theo tháng; chỉnh sửa ri
 - `node tests/management.cjs`: quản lý trong Cài đặt, ngừng/theo dõi lại, hoàn tác và chi tiết còn phải chi.
 
 Kiểm thử trình duyệt cần máy chủ demo, Playwright và Microsoft Edge; có thể đặt `PLAYWRIGHT_MODULE_PATH`. Không dùng dữ liệu tài khoản thật để chạy kiểm thử.
+
+## Ngân sách tháng, ví cộng dồn và tự động
+
+Card chính tính riêng thu dự kiến trừ toàn bộ chi phí của tháng, không chuyển dư tháng trước. Ví là số tiền cộng dồn từ giao dịch và đối chiếu; không cộng dư tháng vào ví thêm lần nữa. Chênh lệch đối chiếu lưu riêng, không phân loại thu/chi.
+
+Khoản thu/chi dùng ngày ghi nhận hằng tháng (mặc định ngày 1); nợ dùng ngày thanh toán. Ngày 31 được giới hạn đến cuối tháng. Tự động bắt đầu từ tháng kích hoạt, xử lý bù các kỳ đến hạn khi mở lại app và khi qua ngày mới. Không có tiến trình chạy trên máy chủ khi app đóng.
+
+Giao dịch có mã ổn định để tránh tạo trùng. Khoản vay cập nhật số kỳ và dư nợ theo lịch; thanh toán thẻ ghi số tiền tháng đã nhập, không suy đoán phần gốc/lãi sao kê. Hoàn tác hoặc xóa khoản tự động được ghi nhớ cho tháng đó. Có thể tắt/bật trong Cài đặt. Ví là ước tính cho đến khi đối chiếu thực tế.
+
+Thanh điều hướng cao 66px, nút Thu chi nổi ở giữa, cách đáy 4px hoặc khoảng an toàn thiết bị. `node tests/schedule.cjs` kiểm tra tự động, đối chiếu độc lập và vị trí thanh điều hướng.

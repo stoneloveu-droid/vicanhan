@@ -1,3 +1,4 @@
+import { applySchedule, scheduleKey } from './schedule.js';
 import { normalizeData } from './data-schema.js';
 // ── app.js ────────────────────────────────────────────────────
 // State trung tâm, Firebase sync, auth, business logic,
@@ -41,9 +42,10 @@ let walletHidden=false;
 let showAllTxnsFlag=false;
 let isSavingToFirestore=false;
 let loaded=false, baseline=null, pendingSnapshot=null;
-const emptyData=()=>({debts:[],income:[],expense:[],ticks:{},txns:{},savings:[],loanBook:[],walletBase:0,lastAutoMonth:'',balanceNotes:null,monthlyPlans:{},recurringPlans:{}});
-function persisted(){return {debts,income,expense,ticks,txns,savings,loanBook,walletBase,lastAutoMonth,balanceNotes,monthlyPlans,recurringPlans};}
-function applyData(data){ ({debts,income,expense,ticks,txns,savings,loanBook,walletBase,lastAutoMonth,balanceNotes,monthlyPlans,recurringPlans}=normalizeData({...emptyData(),...data})); }
+let automation=null;
+const emptyData=()=>({debts:[],income:[],expense:[],ticks:{},txns:{},savings:[],loanBook:[],walletBase:0,lastAutoMonth:'',automation:null,balanceNotes:null,monthlyPlans:{},recurringPlans:{}});
+function persisted(){return {debts,income,expense,ticks,txns,savings,loanBook,walletBase,lastAutoMonth,automation,balanceNotes,monthlyPlans,recurringPlans};}
+function applyData(data){ ({debts,income,expense,ticks,txns,savings,loanBook,walletBase,lastAutoMonth,automation,balanceNotes,monthlyPlans,recurringPlans}=applySchedule(normalizeData({...emptyData(),...data}))); }
 
 let onboardingStep=1;
 let currentPage = 'home'; // track trang đang hiển thị
@@ -73,19 +75,20 @@ function startRealtimeSync(){
     baseline=clone(persisted());loaded=true;
     setSyncBadge('synced','Đã đồng bộ');renderAll();
     if(!snap.exists()&&!window._onboardingDone) openOnboarding();
+    if(snap.exists()&&automation?.enabled&&snap.data()?.automation?.lastRun!==localDate())saveToFirestore().catch(e=>showToast(e.message));
   },(e)=>{setSyncBadge('error','Không thể tải dữ liệu');showToast('Không thể tải dữ liệu. Kiểm tra kết nối rồi thử lại.');console.error(e);});
 }
 async function saveToFirestore(){
   if(!uid||!loaded) throw new Error('Chờ dữ liệu tải xong trước khi lưu.');
   if(isSavingToFirestore) throw new Error('Đang lưu thay đổi trước đó.');
   const ref=userDoc(), sessionUid=uid;
-  const before=clone(baseline), desired=clone(persisted());
+  const before=clone(baseline), desired=applySchedule(clone(persisted()));
   isSavingToFirestore=true; pendingSnapshot=null;
   document.body.classList.add('saving');setSyncBadge('syncing','Đang lưu…');
   try{
     const saved=await runTransaction(db,async transaction=>{
       const snap=await transaction.get(ref);
-      const remote=normalizeData({...emptyData(),...(snap.exists()?snap.data():{})});
+      const remote=applySchedule(normalizeData({...emptyData(),...(snap.exists()?snap.data():{})}));
       const result=mergeState(before,desired,remote);
       transaction.set(ref,result);return result;
     });
@@ -202,7 +205,7 @@ onAuthStateChanged(auth,async(user)=>{
 
 // ── RENDER ALL ────────────────────────────────────────────────
 function getState(){
-  return {debts:debts.filter(d=>isDebtActive(d,currentMonth)||ticks[currentMonth]?.[d.id]),managedDebts:debts,...plansForMonth({debts,income,expense,monthlyPlans,recurringPlans},currentMonth),recurring:recurringForMonth({income,expense,recurringPlans},currentMonth),ticks,txns,savings,loanBook,walletBase,balanceNotes,
+  return {debts:debts.filter(d=>isDebtActive(d,currentMonth)||ticks[currentMonth]?.[d.id]),managedDebts:debts,...plansForMonth({debts,income,expense,monthlyPlans,recurringPlans},currentMonth),recurring:recurringForMonth({income,expense,recurringPlans},currentMonth),ticks,txns,savings,loanBook,walletBase,automation,balanceNotes,
           walletHidden,currentMonth,currentFilter,
           currentTheme:getCurrentTheme(),showAllTxnsFlag};
 }
@@ -461,7 +464,7 @@ window.openPlanPayment=async function(mode,id){
   const plan=getState()[mode].find(p=>p.id===id);if(!plan)return;
   if(plan.debtId&&!debts.some(d=>d.id===plan.debtId))return;
   if(!plan.debtId&&planRemaining(plan,monthlyEntries(getState()),mode==='income'?'in':'out')===0){
-    const entry=(txns[currentMonth]||[]).filter(t=>t.planId===id&&t.type===(mode==='income'?'in':'out')).at(-1);if(entry){txns[currentMonth]=txns[currentMonth].filter(t=>t.id!==entry.id);await saveToFirestore();renderAll();showToast('Đã hoàn tác');return;}return;
+    const entry=(txns[currentMonth]||[]).filter(t=>t.planId===id&&t.type===(mode==='income'?'in':'out')).at(-1);if(entry){if(automation){automation.skips ||= {};automation.skips[scheduleKey(currentMonth,mode,id)]=true;}txns[currentMonth]=txns[currentMonth].filter(t=>t.id!==entry.id);await saveToFirestore();renderAll();showToast('Đã hoàn tác');return;}return;
   }
   if(mode==='expense'&&plan.debtId&&debts.some(d=>d.id===plan.debtId)){window.tapCheck(plan.debtId);return;}
   window.openTxnModalType(mode==='income'?'in':'out');
@@ -480,6 +483,7 @@ function recordDebtPayment(d,t){
   if(d.type==='tc'){d.curTerm=Math.min(previousTerm+1,d.totalTerm);d.settled=d.curTerm>=d.totalTerm;}
 }
 function undoDebtPayment(id){
+  if(automation){automation.skips ||= {};automation.skips[scheduleKey(currentMonth,'debt',id)]=true;}
   const marks=ticks[currentMonth]||{},old=marks[id],d=debts.find(x=>x.id===id);
   if(old&&typeof old==='object'&&old.advanced&&d){
     if(Number(d.curTerm)!==old.previousTerm+1)throw Error('Hãy hoàn tác kỳ thanh toán mới nhất trước.');
@@ -591,6 +595,7 @@ window.deleteTxn=function(){
   if(!editTxnId) return;
   confirmAction('Xoá giao dịch này?',async()=>{
     const entry=(txns[currentMonth]||[]).find(x=>x.id===editTxnId);
+    if(entry?.scheduleKey&&automation){automation.skips ||= {};automation.skips[entry.scheduleKey]=true;}
     if(entry?.debtId)undoDebtPayment(entry.debtId);
     txns[currentMonth]=(txns[currentMonth]||[]).filter(x=>x.id!==editTxnId);
     await saveToFirestore();window.closeModal('modal-txn');
@@ -650,7 +655,8 @@ window.saveBalanceNote=async function(){
   const id=item?.id||'bn-'+crypto.randomUUID();
   const accountId=item?.accountId||'main';
   const includedTxnIds=item&&item.date===date?item.includedTxnIds:Object.values(txns).flat().filter(t=>t.date<=date).map(t=>t.id);
-  const update={name,kind,amount,date,note,accountId};
+  const expected=balanceSummary(balanceNotes,walletBase,txns,date).total;
+  const update={name,kind,amount,date,note,accountId,adjustment:item?(Number(item.adjustment)||0)+amount-Number(item.amount):amount-expected};
   if(includedTxnIds)update.includedTxnIds=includedTxnIds;
   if(item)Object.assign(item,update);else entries.push({id,...update});
   balanceNotes=entries;
@@ -873,7 +879,7 @@ window.saveDebt=async function(){
     obj={...obj,principal,rate,totalTerm,curTerm,disburseDate,note,method,settled,rateConverted:true};
   }
   if(editDebtId){const d=debts.find(x=>x.id===editDebtId);if(d) Object.assign(d,obj);}
-  else debts.push({id:'d'+Date.now(),...obj});
+  else debts.push({id:'d'+Date.now(),startMonth:currentMonth,...obj});
   await saveToFirestore();window.closeModal('modal-debt');renderAll();
   showToast(editDebtId?'✓ Đã cập nhật':'✓ Đã thêm');
 };
@@ -890,6 +896,7 @@ window.deleteDebt=function(){
 function setupFinOptions(item){
   const state={income,expense,recurringPlans,monthlyPlans};
   document.getElementById('mf-start').value=currentMonth;
+  document.getElementById('mf-day').value=item?.payDay||1;
   document.getElementById('mf-repeat').value=!item||isRecurringPlan(state,finMode,item,currentMonth)?'recurring':'month';
   fillSelect('mf-debt',debts.filter(d=>!d.settled||ticks[currentMonth]?.[d.id]).map(d=>({id:d.id,name:d.name})),'Không liên kết khoản nợ',item?.debtId||'');
   document.getElementById('mf-debt-field').hidden=finMode!=='expense';
@@ -930,7 +937,9 @@ window.saveFin=async function(){
   if(!name||!Number.isFinite(amount)||amount<=0){showToast('Nhập tên và số tiền hợp lệ.');return;}
   const startMonth=document.getElementById('mf-start').value;
   if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(startMonth)){showToast('Chọn tháng bắt đầu hợp lệ.');return;}
-  const item={id:editFinId||'f-'+crypto.randomUUID(),name,amount,note,debtId,startMonth};
+  const payDay=Number(document.getElementById('mf-day').value);
+  if(!Number.isInteger(payDay)||payDay<1||payDay>31){showToast('Chọn ngày từ 1 đến 31.');return;}
+  const item={id:editFinId||'f-'+crypto.randomUUID(),name,amount,note,debtId,startMonth,payDay};
   const old=getState()[finMode].find(p=>p.id===editFinId);
   if(debtId&&debtId!==old?.debtId&&(txns[startMonth]||[]).some(t=>t.planId===item.id)){
     showToast('Khoản này đã có giao dịch. Hãy gỡ liên kết kế hoạch trong giao dịch trước khi liên kết nợ.');return;
@@ -1064,7 +1073,7 @@ window.shareTxnReport=function(){
     'Dự thu: '+fmt(s.fixedIncome),'Dự chi: '+fmt(s.plannedExpense),'Dự chi đã trả: '+fmt(s.paidPlanned),
     'Nợ đã thanh toán: '+fmt(s.paidDebt),
     'Ghi chú tiết kiệm: '+fmt(s.savingTotal),
-    'Tiền hiện có: '+fmt(s.balanceTotal),'Còn phải chi: '+fmt(s.reserved),'Ước tính có thể chi: '+fmt(s.available),
+    'Tiền hiện có: '+fmt(s.balanceTotal),'Còn phải chi: '+fmt(s.reserved),'Tháng này còn dư: '+fmt(s.monthlyBudget),
     ''];
   entries.slice().sort((a,b)=>(b.date||'').localeCompare(a.date||'')).slice(0,10).forEach(t=>lines.push((t.type==='transfer'?'⇄ ':t.type==='in'?'↑ ':'↓ ')+t.name+': '+fmt(t.amount)+(t.date?' · '+t.date:'')));
   if(entries.length>10)lines.push('... và '+(entries.length-10)+' khoản khác');
@@ -1170,6 +1179,18 @@ window.showMethodHelp=function(){
   const el=document.getElementById('method-help');
   if(el) el.style.display=el.style.display==='none'?'block':'none';
 };
+
+
+window.toggleAutomation=async function(enabled){
+ automation={...automation,enabled,fromMonth:automation?.fromMonth||localDate().slice(0,7),skips:automation?.skips||{}};
+ await saveToFirestore();renderAll();
+};
+async function refreshSchedule(){
+ if(!uid||!loaded||isSavingToFirestore||!automation?.enabled||automation.lastRun===localDate())return;
+ applyData(persisted());await saveToFirestore();renderAll();
+}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshSchedule().catch(e=>showToast(e.message));});
+setInterval(()=>refreshSchedule().catch(e=>showToast(e.message)),60000);
 
 // Shared error boundary for asynchronous UI handlers.
 for(const [name,handler] of Object.entries(window)){

@@ -216,3 +216,31 @@ test('explicit recurring start month leaves preceding months unchanged',()=>{
  assert.equal(plansForMonth(state,'2026-11').income[0].startMonth,'2026-11');
  assert.equal(plansForMonth(state,'2027-01').expense[0].amount,100);
 });
+
+test('monthly budget is independent of wallet and payments never deduct a plan twice',()=>{
+ const state={currentMonth:'2026-09',today:'2026-09-30',income:[{id:'salary',amount:1000}],expense:[{id:'rent',amount:300}],balanceNotes:[{id:'main',accountId:'main',amount:5000,date:'2026-09-01',includedTxnIds:[]}],txns:{'2026-09':[]}};
+ assert.equal(monthSummary(state).monthlyBudget,700);
+ state.txns['2026-09'].push({id:'paid',accountId:'main',type:'out',amount:300,planId:'rent',date:'2026-09-02'});
+ assert.equal(monthSummary(state).monthlyBudget,700);assert.equal(monthSummary(state).balanceTotal,4700);
+ state.txns['2026-09'].push({id:'extra',accountId:'main',type:'out',amount:50,date:'2026-09-03'});
+ assert.equal(monthSummary(state).monthlyBudget,650);
+ assert.equal(monthSummary({...state,balanceNotes:[]}).monthlyBudget,650);
+ assert.equal(monthSummary({...state,currentMonth:'2026-10',today:'2026-10-01'}).monthlyBudget,700);
+});
+test('scheduled catch-up is idempotent, advances loans, clamps dates and honors overrides',async()=>{
+ const {applySchedule,scheduleKey}=await import('../schedule.js');
+ const s={automation:{enabled:true,fromMonth:'2026-01',skips:{}},income:[{id:'salary',name:'Lương',amount:1000,payDay:1}],expense:[{id:'rent',name:'Nhà',amount:100,payDay:31}],debts:[{id:'loan',name:'Vay',type:'tc',principal:300,rate:0,totalTerm:3,curTerm:0,payDay:31}],txns:{},ticks:{}};
+ const result=applySchedule(s,'2026-03-15');
+ assert.equal(result.debts[0].curTerm,2);
+ assert.equal(result.txns['2026-02'].find(t=>t.planId==='rent').date,'2026-02-28');
+ assert.equal(result.txns['2026-03'].filter(t=>t.type==='out').length,0);
+ assert.deepEqual(applySchedule(result,'2026-03-15'),result);
+ assert.equal(s.debts[0].curTerm,0);
+ const done=applySchedule(result,'2026-04-30');
+ assert.equal(done.debts[0].curTerm,3);assert(done.debts[0].settled);assert(!done.ticks['2026-04'].loan);
+ const skipped=structuredClone(s);skipped.automation.skips[scheduleKey('2026-01','debt','loan')]=true;
+ const skippedResult=applySchedule(skipped,'2026-01-31');assert(!skippedResult.ticks['2026-01'].loan);assert.equal(skippedResult.debts[0].curTerm,0);
+ const partial=structuredClone(s);partial.txns={'2026-01':[{id:'manual',type:'out',planId:'rent',amount:40,date:'2026-01-01'}]};
+ const p=applySchedule(partial,'2026-01-31');assert.equal(p.txns['2026-01'].find(t=>t.scheduleKey===scheduleKey('2026-01','expense','rent')).amount,60);
+ assert.deepEqual(applySchedule({...s,automation:{enabled:false}},'2026-03-31'),{...s,automation:{enabled:false}});
+});

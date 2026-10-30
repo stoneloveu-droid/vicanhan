@@ -1,26 +1,26 @@
-import { applySchedule, scheduleKey } from './schedule.js';
-import { normalizeData } from './data-schema.js';
+import { applySchedule, scheduleKey } from './schedule.js?v=f1f5d89c3fbf';
+import { normalizeData } from './data-schema.js?v=f1f5d89c3fbf';
 // ── app.js ────────────────────────────────────────────────────
 // State trung tâm, Firebase sync, auth, business logic,
 // tất cả window.* event handlers
 // ─────────────────────────────────────────────────────────────
 
-import { isDebtActive, recurringForMonth, plansForMonth, isRecurringPlan, changePlan, monthlyEntries, balanceSummary, accountEntries, planRemaining, monthSummary, paymentAmount, mergeState, escapeHTML, localDate, balanceEntries, recordedEntries } from './finance.js';
-import './experience.js';
-import { renderBalanceBook } from './notebook-ui.js';
+import { isDebtActive, recurringForMonth, plansForMonth, isRecurringPlan, changePlan, monthlyEntries, balanceSummary, accountEntries, planRemaining, monthSummary, paymentAmount, mergeState, escapeHTML, localDate, balanceEntries, recordedEntries } from './finance.js?v=f1f5d89c3fbf';
+import './experience.js?v=f1f5d89c3fbf';
+import { renderBalanceBook } from './notebook-ui.js?v=f1f5d89c3fbf';
 import { auth, db, doc, onSnapshot, runTransaction, getDoc, linkWithPopup,
          GoogleAuthProvider, signInWithPopup, signInAnonymously,
-         onAuthStateChanged, signOut } from "./firebase.js";
+         onAuthStateChanged, signOut } from "./firebase.js?v=f1f5d89c3fbf";
 import { fmt, fmtNoUnit, getML,
          tcCurrentPayment, tcBalance, tcGetMonthly, tcGetDebt,
-         tcTotalInterest, tcPaymentAtTerm, tcScheduleTable } from "./calc.js";
+         tcTotalInterest, tcPaymentAtTerm, tcScheduleTable } from "./calc.js?v=f1f5d89c3fbf";
 import { fmtInput, getInputVal, setInputFmt,
          showToast, confirmAction, setSyncBadge,
          initTheme, setTheme, getCurrentTheme, initAccent,
-         setOnPickMonth } from "./ui-utils.js";
+         setOnPickMonth } from "./ui-utils.js?v=f1f5d89c3fbf";
 import { renderHome, renderPaid, renderCards, renderTxnPage,
          renderSavingList, renderSettings, renderTools, renderSchedule,
-         renderReport, renderLoanBookList, renderAnalyze } from "./render.js";
+         renderReport, renderLoanBookList, renderAnalyze } from "./render.js?v=f1f5d89c3fbf";
 
 // ── DEFAULTS ─────────────────────────────────────────────────
 const DEF_DEBTS = [];

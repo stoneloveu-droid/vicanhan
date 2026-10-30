@@ -1,11 +1,11 @@
-import { escapeHTML } from './finance.js';
+import { escapeHTML } from './finance.js?v=f1f5d89c3fbf';
 // ── ui-utils.js ──────────────────────────────────────────────
 // DOM helpers, format inputs, toast, confirmAction, modals,
 // theme/accent, month picker, sync badge
 // Không import state — nhận dữ liệu qua tham số hoặc từ window.*
 // ─────────────────────────────────────────────────────────────
 
-import { fmt, fmtNoUnit } from "./calc.js";
+import { fmt, fmtNoUnit } from "./calc.js?v=f1f5d89c3fbf";
 
 // ── FORMAT INPUT ──────────────────────────────────────────────
 export function fmtInput(el){

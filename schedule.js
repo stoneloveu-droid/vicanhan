@@ -1,5 +1,5 @@
-import {dueDate,localDate,plansForMonth,planRemaining,isDebtActive,paymentAmount} from './finance.js';
-import {tcCurrentPayment} from './calc.js';
+import {dueDate,localDate,plansForMonth,planRemaining,isDebtActive,paymentAmount} from './finance.js?v=f1f5d89c3fbf';
+import {tcCurrentPayment} from './calc.js?v=f1f5d89c3fbf';
 export function scheduleKey(month,kind,id){return month+'|'+kind+'|'+id;}
 export function applySchedule(input,today=localDate()){
  const s=structuredClone(input),current=today.slice(0,7);

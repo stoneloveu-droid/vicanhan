@@ -41,6 +41,8 @@ Kiểm thử trình duyệt cần máy chủ demo và Playwright. Đặt `PLAYWR
 
 `npm run test:visual` kiểm tra 11 màn hình ở chiều rộng 320, 390, 768, 1024 và 1440px, trong chế độ sáng/tối; kiểm tra điều hướng, bộ lọc sau khi lưu và tạo ảnh giao diện trong `artifacts/`.
 
+Trước khi phát hành lên GitHub Pages, chạy `npm run version:assets` rồi `npm run check:assets`. CSS và toàn bộ cây module JavaScript dùng cùng mã phiên bản theo nội dung để tránh HTML mới tải lẫn tệp cũ từ bộ nhớ đệm. `npm run test:cache` kiểm tra nâng cấp trên trình duyệt đã lưu CSS/JavaScript cũ và bố cục mobile sau khi nâng cấp.
+
 ## Ngân sách tháng, ví cộng dồn và tự động
 
 Card chính tính riêng thu dự kiến trừ toàn bộ chi phí của tháng, không chuyển dư tháng trước. Ví là số tiền cộng dồn từ giao dịch và đối chiếu; không cộng dư tháng vào ví thêm lần nữa. Chênh lệch đối chiếu lưu riêng, không phân loại thu/chi.

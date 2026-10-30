@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test tests/finance.test.mjs",
+    "test": "node --test tests/*.test.mjs",
     "preview": "node dev-server.cjs",
     "preview:demo": "node dev-server.cjs --demo"
   }

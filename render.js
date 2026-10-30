@@ -1,5 +1,5 @@
 import { renderBalanceBook } from './notebook-ui.js';
-import { isDebtActive, dueDate, isRecurringPlan, monthlyEntries, planRemaining, monthSummary, paymentAmount, escapeHTML, balanceSummary, balanceEntries, recordedEntries, localDate } from './finance.js';
+import { filterTransactions, isDebtActive, dueDate, isRecurringPlan, monthlyEntries, planRemaining, monthSummary, paymentAmount, escapeHTML, balanceSummary, balanceEntries, recordedEntries, localDate } from './finance.js';
 // ── render.js ─────────────────────────────────────────────────
 // Tất cả hàm render UI: home, paid, cards, txn, settings,
 // tools, report, charts
@@ -243,11 +243,15 @@ export function renderCards({debts, ticks, currentMonth, currentFilter}){
 
 // ── RENDER TXN PAGE ───────────────────────────────────────────
 export function renderTxnPage(state){
- const {debts,income,expense,txns,walletBase,currentMonth,showAllTxnsFlag,filteredTxns}=state;
+ const {debts,income,expense,txns,walletBase,currentMonth,showAllTxnsFlag,txnSearch='',txnTypeFilter='all'}=state;
   const el=id=>document.getElementById(id);
   if(el('txn-month-label')) el('txn-month-label').textContent=getML(currentMonth);
   const summary=monthSummary(state);
   const monthTxns=summary.entries;
+  const filtering=!!txnSearch.trim()||txnTypeFilter!=='all';
+  const filteredTxns=filterTransactions(monthTxns,txnSearch,txnTypeFilter);
+  const status=el('txn-search-status');
+  if(status){status.hidden=!filtering;status.textContent=`Tìm thấy ${filteredTxns.length} / ${monthTxns.length} giao dịch trong tháng`;}
   const {txnIn,txnOut,net:txnRemain,accounts}=summary;
   const accountName=id=>'Số dư chung';
   if(el('txn-kpi-in'))  el('txn-kpi-in').textContent=fmt(txnIn);
@@ -259,7 +263,9 @@ export function renderTxnPage(state){
   const list=el('txn-list');
   if(list){
     list.innerHTML='';
-    if(!(filteredTxns||monthTxns).length){
+    if(filtering&&!filteredTxns.length){
+      list.innerHTML='<div class="empty-card compact"><div class="empty-title">Không tìm thấy giao dịch nào</div><div class="empty-sub">Thử từ khóa khác hoặc chọn tất cả loại giao dịch.</div></div>';
+    } else if(!monthTxns.length){
       list.innerHTML=`<div class="empty-card compact">
         <div class="empty-ico">📝</div>
         <div class="empty-title">Chưa có giao dịch tháng này</div>
@@ -267,7 +273,8 @@ export function renderTxnPage(state){
         <button onclick="openTxnModal()">+ Ghi giao dịch</button>
       </div>`;
     } else {
-      const show=[...(filteredTxns||monthTxns)].sort((a,b)=>(b.date||'').localeCompare(a.date||'')||b.id.localeCompare(a.id)).slice(0,showAllTxnsFlag?9999:8);
+      const sorted=[...filteredTxns].sort((a,b)=>(b.date||'').localeCompare(a.date||'')||String(b.id||'').localeCompare(String(a.id||'')));
+      const show=filtering||showAllTxnsFlag?sorted:sorted.slice(0,8);
       show.forEach(t=>{
         const row=document.createElement('div');row.className='txn-row';
         row.onclick=()=>t.debtId?window.tapTop(t.debtId):window._openTxnEdit&&window._openTxnEdit(t.id);

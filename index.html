@@ -154,20 +154,22 @@
     <span id="txn-kpi-in" hidden></span><span id="txn-kpi-out" hidden></span><span id="txn-kpi-remain" hidden></span>
     <div class="sec-hdr"><span>Các khoản đã ghi</span><div style="display:flex;gap:8px"><span class="sec-see-all" onclick="showAllTxns()">Xem tất cả</span></div></div>
     <div style="padding:0 16px 10px;display:flex;gap:8px;align-items:center">
-      <input id="txn-search" type="text" placeholder="🔍 Tìm giao dịch..."
+      <input id="txn-search" type="search" aria-label="Tìm giao dịch theo tên, danh mục hoặc ghi chú" placeholder="🔍 Tìm giao dịch (có hoặc không dấu)..."
         oninput="window.filterTxnSearch()"
-        style="flex:1;padding:10px 14px;border-radius:12px;border:1px solid var(--border);
+        style="flex:1;min-width:0;padding:10px 14px;border-radius:12px;border:1px solid var(--border);
                background:var(--card2);color:var(--text);font-family:'Mulish',sans-serif;
                font-size:13px;font-weight:700;outline:none">
-      <select id="txn-type-filter" onchange="window.filterTxnSearch()"
+      <select id="txn-type-filter" aria-label="Lọc loại giao dịch" onchange="window.filterTxnSearch()"
         style="padding:10px 10px;border-radius:12px;border:1px solid var(--border);
                background:var(--card2);color:var(--text);font-family:'Mulish',sans-serif;
                font-size:12px;font-weight:700;outline:none;cursor:pointer">
         <option value="all">Tất cả</option>
         <option value="in">Thu</option>
         <option value="out">Chi</option>
+        <option value="transfer">Chuyển tiền</option>
       </select>
     </div>
+    <p id="txn-search-status" role="status" aria-live="polite" hidden style="margin:0 16px 10px;color:var(--sub);font-size:12px"></p>
     <div class="txn-list" id="txn-list"></div>
 
     <div style="height:8px"></div>

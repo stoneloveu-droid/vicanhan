@@ -1,6 +1,6 @@
 
-import { fmt } from './calc.js?v=f1f5d89c3fbf';
-import { balanceEntries,balanceSummary } from './finance.js?v=f1f5d89c3fbf';
+import { fmt } from './calc.js?v=1e1a0e23fe9f';
+import { balanceEntries,balanceSummary } from './finance.js?v=1e1a0e23fe9f';
 const dateLabel=date=>date?new Date(date+'T12:00:00').toLocaleDateString('vi-VN'):'Chưa có ngày đối chiếu';
 export function renderBalanceBook(notes,walletBase,hidden=false,txns={},asOf,computedAccounts){
   const summary=balanceSummary(notes,walletBase,txns,asOf);

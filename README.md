@@ -8,6 +8,7 @@
 - **Nợ:** xem chi tiết, đánh dấu đã trả hoặc hoàn tác. Không có thao tác xóa khoản nợ.
 - **Thu chi → Thu chi cố định:** nhận tiền, thanh toán hoặc hoàn tác giao dịch kế hoạch gần nhất. Thu chi phát sinh được ghi riêng.
 - **Tìm giao dịch:** tìm theo tên, danh mục hoặc ghi chú, có hoặc không dấu; kết hợp lọc Thu, Chi hoặc Chuyển tiền. Khi đang lọc, hiển thị toàn bộ kết quả của tháng; bộ lọc được giữ khi lưu, đồng bộ hoặc đổi tháng và đặt lại khi chuyển tab. Tổng thu chi vẫn tính toàn tháng.
+- **Cài đặt → Tài khoản:** chạm thẻ tên tài khoản để mở/đóng các tùy chọn dữ liệu, giao diện và đăng xuất. Các tùy chọn không bị giới hạn chiều cao; khi đóng, chúng được ẩn khỏi cả thao tác bàn phím. `npm run test:account` kiểm tra thao tác chạm, bàn phím, xuất JSON, lịch sử số dư và chọn giao diện với dữ liệu mẫu.
 - **Ngừng theo dõi khoản nợ:** lưu mốc hiệu lực theo tháng, giữ thông tin khoản nợ và toàn bộ lịch sử. Có thể theo dõi lại trong Cài đặt.
 - **Dừng khoản cố định:** áp dụng từ tháng đang chọn hoặc chỉ riêng tháng đó; các giao dịch đã ghi vẫn còn.
 

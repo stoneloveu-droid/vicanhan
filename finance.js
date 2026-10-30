@@ -1,4 +1,4 @@
-import { tcGetMonthly, tcGetDebt } from './calc.js?v=f1f5d89c3fbf';
+import { tcGetMonthly, tcGetDebt } from './calc.js?v=1e1a0e23fe9f';
 export const localDate = (date = new Date()) => `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
 export const escapeHTML = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const sum = list => list.reduce((total, item) => total + (Number(item.amount) || 0), 0);

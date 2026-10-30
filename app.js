@@ -1,26 +1,26 @@
-import { applySchedule, scheduleKey } from './schedule.js?v=f1f5d89c3fbf';
-import { normalizeData } from './data-schema.js?v=f1f5d89c3fbf';
+import { applySchedule, scheduleKey } from './schedule.js?v=1e1a0e23fe9f';
+import { normalizeData } from './data-schema.js?v=1e1a0e23fe9f';
 // ── app.js ────────────────────────────────────────────────────
 // State trung tâm, Firebase sync, auth, business logic,
 // tất cả window.* event handlers
 // ─────────────────────────────────────────────────────────────
 
-import { isDebtActive, recurringForMonth, plansForMonth, isRecurringPlan, changePlan, monthlyEntries, balanceSummary, accountEntries, planRemaining, monthSummary, paymentAmount, mergeState, escapeHTML, localDate, balanceEntries, recordedEntries } from './finance.js?v=f1f5d89c3fbf';
-import './experience.js?v=f1f5d89c3fbf';
-import { renderBalanceBook } from './notebook-ui.js?v=f1f5d89c3fbf';
+import { isDebtActive, recurringForMonth, plansForMonth, isRecurringPlan, changePlan, monthlyEntries, balanceSummary, accountEntries, planRemaining, monthSummary, paymentAmount, mergeState, escapeHTML, localDate, balanceEntries, recordedEntries } from './finance.js?v=1e1a0e23fe9f';
+import './experience.js?v=1e1a0e23fe9f';
+import { renderBalanceBook } from './notebook-ui.js?v=1e1a0e23fe9f';
 import { auth, db, doc, onSnapshot, runTransaction, getDoc, linkWithPopup,
          GoogleAuthProvider, signInWithPopup, signInAnonymously,
-         onAuthStateChanged, signOut } from "./firebase.js?v=f1f5d89c3fbf";
+         onAuthStateChanged, signOut } from "./firebase.js?v=1e1a0e23fe9f";
 import { fmt, fmtNoUnit, getML,
          tcCurrentPayment, tcBalance, tcGetMonthly, tcGetDebt,
-         tcTotalInterest, tcPaymentAtTerm, tcScheduleTable } from "./calc.js?v=f1f5d89c3fbf";
+         tcTotalInterest, tcPaymentAtTerm, tcScheduleTable } from "./calc.js?v=1e1a0e23fe9f";
 import { fmtInput, getInputVal, setInputFmt,
          showToast, confirmAction, setSyncBadge,
          initTheme, setTheme, getCurrentTheme, initAccent,
-         setOnPickMonth } from "./ui-utils.js?v=f1f5d89c3fbf";
+         setOnPickMonth } from "./ui-utils.js?v=1e1a0e23fe9f";
 import { renderHome, renderPaid, renderCards, renderTxnPage,
          renderSavingList, renderSettings, renderTools, renderSchedule,
-         renderReport, renderLoanBookList, renderAnalyze } from "./render.js?v=f1f5d89c3fbf";
+         renderReport, renderLoanBookList, renderAnalyze } from "./render.js?v=1e1a0e23fe9f";
 
 // ── DEFAULTS ─────────────────────────────────────────────────
 const DEF_DEBTS = [];
@@ -1007,7 +1007,10 @@ window.calcSaving=function(){
 window.toggleAcc=function(id){
   const body=document.getElementById('body-'+id);const arrow=document.getElementById('arr-'+id);if(!body)return;
   const isOpen=body.classList.contains('open');
-  body.classList.toggle('open',!isOpen);arrow.classList.toggle('open',!isOpen);
+  body.classList.toggle('open',!isOpen);
+  body.hidden=isOpen;
+  arrow?.classList.toggle('open',!isOpen);
+  document.querySelector(`[aria-controls="body-${id}"]`)?.setAttribute('aria-expanded',String(!isOpen));
 };
 window.toggleSettMenu=function(){
   const menu=document.getElementById('sett-menu');

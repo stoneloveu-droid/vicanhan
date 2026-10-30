@@ -13,8 +13,8 @@
 <title>Ví của tôi</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<link rel="stylesheet" href="style.css?v=f1f5d89c3fbf">
-<link rel="stylesheet" href="aurora.css?v=f1f5d89c3fbf">
+<link rel="stylesheet" href="style.css?v=1e1a0e23fe9f">
+<link rel="stylesheet" href="aurora.css?v=1e1a0e23fe9f">
 </head>
 <body>
 <div class="loading-overlay" id="loading-overlay"><div class="spinner"></div><p>Đang kết nối…</p></div>
@@ -254,20 +254,20 @@
 <div class="page" id="page-settings">
   <div class="page-header"><div class="ph-title">Cài đặt</div></div>
   <div class="scroll">
-    <div class="user-card">
-      <div class="uc-ava" id="sett-avatar-emoji">
+    <button type="button" class="user-card" id="account-toggle" onclick="toggleAcc('acc-account')" aria-expanded="false" aria-controls="body-acc-account" aria-label="Tùy chọn tài khoản">
+      <span class="uc-ava" id="sett-avatar-emoji">
         <img id="sett-avatar-img" src="" style="display:none;width:100%;height:100%;border-radius:50%;object-fit:cover">
         <span id="sett-avatar-text">👤</span>
-      </div>
-      <div class="uc-info">
-        <div class="uc-name" id="acc-name">—</div>
-        <div class="uc-email" id="acc-email-sub">—</div>
+      </span>
+      <span class="uc-info">
+        <span class="uc-name" id="acc-name">—</span>
+        <span class="uc-email" id="acc-email-sub">—</span>
         <span class="uc-badge" id="acc-provider-badge" style="display:none"><svg width="11" height="11" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg> Google</span>
-      </div>
+      </span>
       <svg class="sr-chev" id="arr-acc-account" viewBox="0 0 24 24" style="transition:transform .25s"><path d="M9 18l6-6-6-6"/></svg>
-    </div>
+    </button>
 
-    <div class="sett-sec-lbl">Tự động theo lịch</div><div class="sett-list"><div class="sett-row"><span class="sr-lbl">Ghi thu, chi và trả nợ<small class="automation-help">Tự ghi theo ngày đã đặt. Nợ các tháng đã qua được đánh dấu hoàn thành; tháng hiện tại có thể hoàn tác.</small></span><label class="tog"><input id="automation-toggle" type="checkbox" onchange="toggleAutomation(this.checked)" aria-label="Tự động ghi nhận theo lịch"><span class="tog-sl"></span></label></div></div><p id="history-estimate-note" class="notebook-hint" hidden></p><div class="sett-sec-lbl">Quản lý</div><div class="sett-list"><button class="sett-row management-link" onclick="switchPage('finance')"><span class="sr-ico purple">☷</span><span class="sr-lbl">Danh mục tài chính<small>Thu cố định · Chi cố định · Thẻ · Khoản vay</small></span><span>›</span></button></div><div class="acc-body" id="body-acc-account">
+    <div class="acc-body" id="body-acc-account" role="region" aria-label="Tùy chọn tài khoản" hidden>
       <div class="sett-sec-lbl">Ví &amp; dữ liệu</div>
       <div class="sett-list"><div class="sett-row" onclick="openBalanceBook()"><div class="sr-ico purple">◈</div><span class="sr-lbl">Số dư và lịch sử cập nhật</span><span class="sr-chev">›</span></div><div class="sett-row" onclick="exportJSON()"><div class="sr-ico blue">↓</div><span class="sr-lbl">Tải bản sao dữ liệu (JSON)</span><span class="sr-chev">›</span></div><div class="sett-row" onclick="exportCSV()"><div class="sr-ico teal"><svg class="inline-icon" width="14" height="14" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 18L18 6 M6 6h12v12"/></svg></div><span class="sr-lbl">Tải bảng thu chi (CSV)</span><span class="sr-chev">›</span></div></div>
       <div class="sett-list">
@@ -295,25 +295,13 @@
       </button>
     </div>
 
+    <div class="sett-sec-lbl">Tự động theo lịch</div><div class="sett-list"><div class="sett-row"><span class="sr-lbl">Ghi thu, chi và trả nợ<small class="automation-help">Tự ghi theo ngày đã đặt. Nợ các tháng đã qua được đánh dấu hoàn thành; tháng hiện tại có thể hoàn tác.</small></span><label class="tog"><input id="automation-toggle" type="checkbox" onchange="toggleAutomation(this.checked)" aria-label="Tự động ghi nhận theo lịch"><span class="tog-sl"></span></label></div></div><p id="history-estimate-note" class="notebook-hint" hidden></p><div class="sett-sec-lbl">Quản lý</div><div class="sett-list"><button class="sett-row management-link" onclick="switchPage('finance')"><span class="sr-ico purple">☷</span><span class="sr-lbl">Danh mục tài chính<small>Thu cố định · Chi cố định · Thẻ · Khoản vay</small></span><span>›</span></button></div>
+
     <div class="sett-sec-lbl">Cài đặt</div>
     <div class="sett-list">
       <div class="sett-row"><div class="sr-ico blue2"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div><span class="sr-lbl">Ví của tôi</span><span class="sr-val">Tài chính cá nhân</span></div>
     </div>
 
-    <!-- Theme modal -->
-    <div class="modal-bg" id="modal-theme" onclick="closeMBg('modal-theme',event)">
-      <div class="msheet">
-        <div class="mhandle"></div><div class="mtitle">Màu sắc chủ đạo</div>
-        <div class="theme-picker">
-          <div class="tp-btn" id="tp-lime"   onclick="setAccent('lime')">  <div class="tp-sw" style="background:#c5dc92"></div><div class="tp-lbl">Lime</div></div>
-          <div class="tp-btn" id="tp-blue"   onclick="setAccent('blue')">  <div class="tp-sw" style="background:#a3c6ed"></div><div class="tp-lbl">Xanh dương</div></div>
-          <div class="tp-btn" id="tp-green"  onclick="setAccent('green')"> <div class="tp-sw" style="background:#80d8ad"></div><div class="tp-lbl">Xanh ngọc</div></div>
-          <div class="tp-btn" id="tp-orange" onclick="setAccent('orange')"><div class="tp-sw" style="background:#e5bd81"></div><div class="tp-lbl">Cam</div></div>
-          <div class="tp-btn" id="tp-purple" onclick="setAccent('purple')"><div class="tp-sw" style="background:#cab6e4"></div><div class="tp-lbl">Tím</div></div>
-        </div>
-        <div class="mbtns"><button class="mbtn mbtn-cancel" onclick="closeModal('modal-theme')">Đóng</button></div>
-      </div>
-    </div>
     <div style="height:8px"></div>
   </div>
 </div>
@@ -333,6 +321,21 @@
 </nav>
 
 <!-- MODALS -->
+    <!-- Theme modal -->
+    <div class="modal-bg" id="modal-theme" onclick="closeMBg('modal-theme',event)">
+      <div class="msheet">
+        <div class="mhandle"></div><div class="mtitle">Màu sắc chủ đạo</div>
+        <div class="theme-picker">
+          <div class="tp-btn" id="tp-lime"   onclick="setAccent('lime')">  <div class="tp-sw" style="background:#c5dc92"></div><div class="tp-lbl">Lime</div></div>
+          <div class="tp-btn" id="tp-blue"   onclick="setAccent('blue')">  <div class="tp-sw" style="background:#a3c6ed"></div><div class="tp-lbl">Xanh dương</div></div>
+          <div class="tp-btn" id="tp-green"  onclick="setAccent('green')"> <div class="tp-sw" style="background:#80d8ad"></div><div class="tp-lbl">Xanh ngọc</div></div>
+          <div class="tp-btn" id="tp-orange" onclick="setAccent('orange')"><div class="tp-sw" style="background:#e5bd81"></div><div class="tp-lbl">Cam</div></div>
+          <div class="tp-btn" id="tp-purple" onclick="setAccent('purple')"><div class="tp-sw" style="background:#cab6e4"></div><div class="tp-lbl">Tím</div></div>
+        </div>
+        <div class="mbtns"><button class="mbtn mbtn-cancel" onclick="closeModal('modal-theme')">Đóng</button></div>
+      </div>
+    </div>
+
 <div class="onboarding-overlay" id="onboarding-overlay">
   <div class="onboarding-card">
     <div class="ob-dots"><span class="ob-dot active" data-step="1"></span><span class="ob-dot" data-step="2"></span><span class="ob-dot" data-step="3"></span></div>
@@ -440,6 +443,6 @@
 <div class="modal-bg" id="modal-wallet" onclick="closeMBg('modal-wallet',event)"><div class="msheet"><div class="mhandle"></div><div class="mtitle">Lịch sử số dư</div><p class="notebook-hint">Mỗi lần kiểm tra và cập nhật số dư được lưu tại đây. Chọn một dòng để sửa thông tin.</p><div id="balance-history"></div><div class="mbtns"><button class="mbtn mbtn-cancel" onclick="closeModal('modal-wallet')">Đóng</button><button class="mbtn mbtn-save" onclick="openBalanceNote()">+ Cập nhật số dư</button></div></div></div>
 <div class="modal-bg" id="modal-balance-note" onclick="closeMBg('modal-balance-note',event)"><div class="msheet"><div class="mhandle"></div><div class="mtitle">Cập nhật số dư</div><div class="fg"><label for="bn-amount">Số dư (đ)</label><input id="bn-amount" inputmode="numeric" oninput="fmtInput(this)" placeholder="0"></div><p class="notebook-hint">Nhập tổng số tiền bạn đang có. Các khoản thu và chi tiếp theo sẽ được cộng hoặc trừ từ số dư này.</p><div class="fg"><label for="bn-date">Ngày cập nhật</label><input id="bn-date" type="date"></div><div class="fg"><label for="bn-note">Ghi chú thêm</label><input id="bn-note" placeholder="Không bắt buộc" maxlength="300"></div><div class="mbtns"><button class="mbtn mbtn-cancel" onclick="closeModal('modal-balance-note')">Đóng</button><button class="mbtn mbtn-del" id="bn-del" onclick="deleteBalanceNote()">Xoá</button><button class="mbtn mbtn-save" onclick="saveBalanceNote()">Lưu</button></div></div></div>
 <div class="settings-footer" hidden id="sync-status-text" role="status"></div>
-<script type="module" src="app.js?v=f1f5d89c3fbf"></script>
+<script type="module" src="app.js?v=1e1a0e23fe9f"></script>
 </body>
 </html>

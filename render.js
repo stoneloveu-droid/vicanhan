@@ -1,5 +1,5 @@
 import { renderBalanceBook } from './notebook-ui.js';
-import { isDebtActive, dueDate, isRecurringPlan, monthlyEntries, planRemaining, monthSummary, paymentAmount, escapeHTML, balanceSummary, balanceEntries, recordedEntries, localDate } from './finance.js';
+import { filterTransactions, isDebtActive, dueDate, isRecurringPlan, monthlyEntries, planRemaining, monthSummary, paymentAmount, escapeHTML, balanceSummary, balanceEntries, recordedEntries, localDate } from './finance.js';
 // ── render.js ─────────────────────────────────────────────────
 // Tất cả hàm render UI: home, paid, cards, txn, settings,
 // tools, report, charts
@@ -243,11 +243,15 @@ export function renderCards({debts, ticks, currentMonth, currentFilter}){
 
 // ── RENDER TXN PAGE ───────────────────────────────────────────
 export function renderTxnPage(state){
- const {debts,income,expense,txns,walletBase,currentMonth,showAllTxnsFlag,filteredTxns}=state;
+ const {debts,income,expense,txns,walletBase,currentMonth,showAllTxnsFlag,txnSearch='',txnTypeFilter='all'}=state;
   const el=id=>document.getElementById(id);
   if(el('txn-month-label')) el('txn-month-label').textContent=getML(currentMonth);
   const summary=monthSummary(state);
   const monthTxns=summary.entries;
+  const filtering=!!txnSearch.trim()||txnTypeFilter!=='all';
+  const filteredTxns=filterTransactions(monthTxns,txnSearch,txnTypeFilter);
+  const status=el('txn-search-status');
+  if(status){status.hidden=!filtering;status.textContent=`Tìm thấy ${filteredTxns.length} / ${monthTxns.length} giao dịch trong tháng`;}
   const {txnIn,txnOut,net:txnRemain,accounts}=summary;
   const accountName=id=>'Số dư chung';
   if(el('txn-kpi-in'))  el('txn-kpi-in').textContent=fmt(txnIn);
@@ -259,22 +263,25 @@ export function renderTxnPage(state){
   const list=el('txn-list');
   if(list){
     list.innerHTML='';
-    if(!(filteredTxns||monthTxns).length){
+    if(filtering&&!filteredTxns.length){
+      list.innerHTML='<div class="empty-card compact"><div class="empty-title">Không tìm thấy giao dịch nào</div><div class="empty-sub">Thử từ khóa khác hoặc chọn tất cả loại giao dịch.</div></div>';
+    } else if(!monthTxns.length){
       list.innerHTML=`<div class="empty-card compact">
-        <div class="empty-ico">📝</div>
+        <div class="empty-ico" aria-hidden="true">↗</div>
         <div class="empty-title">Chưa có giao dịch tháng này</div>
         <div class="empty-sub">Ghi lại thu nhập và chi tiêu để theo dõi dòng tiền</div>
         <button onclick="openTxnModal()">+ Ghi giao dịch</button>
       </div>`;
     } else {
-      const show=[...(filteredTxns||monthTxns)].sort((a,b)=>(b.date||'').localeCompare(a.date||'')||b.id.localeCompare(a.id)).slice(0,showAllTxnsFlag?9999:8);
+      const sorted=[...filteredTxns].sort((a,b)=>(b.date||'').localeCompare(a.date||'')||String(b.id||'').localeCompare(String(a.id||'')));
+      const show=filtering||showAllTxnsFlag?sorted:sorted.slice(0,8);
       show.forEach(t=>{
         const row=document.createElement('div');row.className='txn-row';
         row.onclick=()=>t.debtId?window.tapTop(t.debtId):window._openTxnEdit&&window._openTxnEdit(t.id);
-        const ico=t.type==='transfer'?'⇄':txnCatIcon(t.name,t.type);
-        const bg=t.type==='in'?'rgba(76,175,80,.12)':'rgba(255,79,79,.12)';
+        const ico=txnCatIcon(t.name,t.type);
+        const tone=t.type==='in'?'green':t.type==='transfer'?'blue':'red';
         row.innerHTML=`
-          <div class="txn-cat-ico" style="background:${bg}">${ico}</div>
+          <div class="txn-cat-ico txn-icon-${tone}" aria-hidden="true">${ico}</div>
           <div class="txn-info">
             <div class="txn-name">${escapeHTML(t.name)}</div><small class="txn-account-note">${escapeHTML(accountName(t.accountId))}${t.type==='transfer'?' → '+escapeHTML(accountName(t.toAccountId)):''}</small>
             ${t.date?`<div style="font-size:10px;color:var(--sub);font-weight:600">${new Date(t.date).toLocaleDateString('vi-VN',{day:'numeric',month:'numeric'})}</div>`:''}
@@ -292,19 +299,17 @@ export function renderTxnPage(state){
 }
 
 function txnCatIcon(name,type){
-  if(type==='in'){
-    if(/lương|salary/i.test(name)) return '💼';
-    if(/thưởng|bonus/i.test(name)) return '🎁';
-    if(/bán/i.test(name)) return '🛒';
-    return '💰';
-  }
-  if(/ăn|food|cơm/i.test(name)) return '🍜';
-  if(/xăng|xe|đi lại|di chuyển/i.test(name)) return '🚗';
-  if(/mua sắm|shop/i.test(name)) return '🛍️';
-  if(/điện|nước|internet/i.test(name)) return '💡';
-  if(/y tế|thuốc|bệnh/i.test(name)) return '💊';
-  if(/giải trí|cafe|nhà hàng/i.test(name)) return '🎬';
-  return '📝';
+  let path='M7 7h10v10H7z M10 11h4 M10 14h2';
+  if(type==='transfer')path='M4 7h15l-4-4 M20 17H5l4 4';
+  else if(type==='in')path=/lương|salary/i.test(name)?'M4 7h16v13H4z M8 7V4h8v3 M4 12h16 M10 12v3h4v-3':'M17 7L7 17 M7 7v10h10';
+  else if(/ăn|food|cơm/i.test(name))path='M5 3v7a3 3 0 0 0 6 0V3 M8 3v18 M19 3c-4 2-4 9 0 10V3v18';
+  else if(/xăng|xe|đi lại|di chuyển/i.test(name))path='M5 10l2-6h10l2 6 M4 10h16v8H4z M7 14h1 M16 14h1 M6 18v3 M18 18v3';
+  else if(/mua sắm|shop/i.test(name))path='M5 7h14l1 14H4z M9 8V6a3 3 0 0 1 6 0v2';
+  else if(/điện|nước|internet/i.test(name))path='M13 2L5 14h6l-1 8 9-13h-7z';
+  else if(/y tế|thuốc|bệnh/i.test(name))path='M4 5h16v16H4z M9 5V3h6v2 M12 9v8 M8 13h8';
+  else if(/cà phê|cafe/i.test(name))path='M4 8h12v7a5 5 0 0 1-10 0V8 M16 9h2a3 3 0 0 1 0 6h-2 M4 21h14 M8 3v2 M12 3v2';
+  else path='M7 7l10 10 M7 17h10V7';
+  return `<svg class="ui-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="${path}"/></svg>`;
 }
 
 // ── RENDER SAVING LIST ────────────────────────────────────────

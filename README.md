@@ -7,6 +7,7 @@
 - **Cài đặt → Danh mục tài chính:** danh sách thu cố định, chi cố định, thẻ tín dụng và khoản vay. Thêm, sửa và dừng áp dụng tại đây. Khoản thu/chi có trường tháng bắt đầu; chỉ tính kế hoạch từ tháng đó.
 - **Nợ:** xem chi tiết, đánh dấu đã trả hoặc hoàn tác. Không có thao tác xóa khoản nợ.
 - **Thu chi → Thu chi cố định:** nhận tiền, thanh toán hoặc hoàn tác giao dịch kế hoạch gần nhất. Thu chi phát sinh được ghi riêng.
+- **Tìm giao dịch:** tìm theo tên, danh mục hoặc ghi chú, có hoặc không dấu; kết hợp lọc Thu, Chi hoặc Chuyển tiền. Khi đang lọc, hiển thị toàn bộ kết quả của tháng; bộ lọc được giữ khi lưu, đồng bộ hoặc đổi tháng và đặt lại khi chuyển tab. Tổng thu chi vẫn tính toàn tháng.
 - **Ngừng theo dõi khoản nợ:** lưu mốc hiệu lực theo tháng, giữ thông tin khoản nợ và toàn bộ lịch sử. Có thể theo dõi lại trong Cài đặt.
 - **Dừng khoản cố định:** áp dụng từ tháng đang chọn hoặc chỉ riêng tháng đó; các giao dịch đã ghi vẫn còn.
 
@@ -36,7 +37,9 @@ Kế hoạch cố định dùng mốc hiệu lực theo tháng; chỉnh sửa ri
 - `node tests/monthly.cjs`: thu chi cố định và tổng hợp tháng.
 - `node tests/management.cjs`: quản lý trong Cài đặt, ngừng/theo dõi lại, hoàn tác và chi tiết còn phải chi.
 
-Kiểm thử trình duyệt cần máy chủ demo, Playwright và Microsoft Edge; có thể đặt `PLAYWRIGHT_MODULE_PATH`. Không dùng dữ liệu tài khoản thật để chạy kiểm thử.
+Kiểm thử trình duyệt cần máy chủ demo và Playwright. Đặt `PLAYWRIGHT_MODULE_PATH` nếu Playwright nằm ngoài dự án, `PLAYWRIGHT_EXECUTABLE_PATH` nếu dùng Chromium có sẵn; các bộ kiểm thử cũ mặc định dùng Microsoft Edge khi không chỉ định trình duyệt. Không dùng dữ liệu tài khoản thật để chạy kiểm thử.
+
+`npm run test:visual` kiểm tra 11 màn hình ở chiều rộng 320, 390, 768, 1024 và 1440px, trong chế độ sáng/tối; kiểm tra điều hướng, bộ lọc sau khi lưu và tạo ảnh giao diện trong `artifacts/`.
 
 ## Ngân sách tháng, ví cộng dồn và tự động
 
@@ -46,4 +49,4 @@ Khoản thu/chi dùng ngày ghi nhận hằng tháng (mặc định ngày 1); n�
 
 Giao dịch có mã ổn định để tránh tạo trùng. Khoản vay cập nhật số kỳ và dư nợ theo lịch; thanh toán thẻ ghi số tiền tháng đã nhập, không suy đoán phần gốc/lãi sao kê. Hoàn tác hoặc xóa khoản tự động được ghi nhớ cho tháng đó. Có thể tắt/bật trong Cài đặt. Ví là ước tính cho đến khi đối chiếu thực tế.
 
-Thanh điều hướng cao 66px, nút Thu chi nổi ở giữa, cách đáy 4px hoặc khoảng an toàn thiết bị. `node tests/schedule.cjs` kiểm tra tự động, đối chiếu độc lập và vị trí thanh điều hướng.
+Giao diện dùng nền trung tính, thẻ ngân sách xanh đậm và biểu tượng nét. Màu nhấn mặc định là xanh ngọc; lựa chọn màu và chế độ sáng/tối đã lưu vẫn được giữ. Trên điện thoại, thanh điều hướng cao 74px, cách đáy 8px hoặc khoảng an toàn thiết bị. Từ 1024px, điều hướng chuyển sang cột bên trái và Tổng quan chia hai cột. `node tests/schedule.cjs` kiểm tra tự động, đối chiếu độc lập và vị trí thanh điều hướng.

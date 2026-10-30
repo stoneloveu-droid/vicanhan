@@ -40,6 +40,7 @@ let editLoanId=null;
 let uid=null, unsubSnap=null;
 let walletHidden=false;
 let showAllTxnsFlag=false;
+let txnSearch='', txnTypeFilter='all';
 let isSavingToFirestore=false;
 let loaded=false, baseline=null, pendingSnapshot=null;
 let automation=null;
@@ -207,7 +208,7 @@ onAuthStateChanged(auth,async(user)=>{
 function getState(){
   return {debts:debts.filter(d=>isDebtActive(d,currentMonth)||ticks[currentMonth]?.[d.id]),managedDebts:debts,...plansForMonth({debts,income,expense,monthlyPlans,recurringPlans},currentMonth),recurring:recurringForMonth({income,expense,recurringPlans},currentMonth),ticks,txns,savings,loanBook,walletBase,automation,balanceNotes,
           walletHidden,currentMonth,currentFilter,
-          currentTheme:getCurrentTheme(),showAllTxnsFlag};
+          currentTheme:getCurrentTheme(),showAllTxnsFlag,txnSearch,txnTypeFilter};
 }
 
 // ── ONBOARDING ────────────────────────────────────────────────
@@ -302,6 +303,7 @@ window.switchPage=function(name){
   document.getElementById('nav-'+navName)?.classList.add('active');
   openDetail=null;showAllTxnsFlag=false;
   // Reset txn search khi rời tab
+  txnSearch='';txnTypeFilter='all';
   const _tsEl=document.getElementById('txn-search');
   const _tfEl=document.getElementById('txn-type-filter');
   if(_tsEl) _tsEl.value='';
@@ -610,23 +612,9 @@ window.openTxnModalType=function(type){
 };
 window.showAllTxns=()=>{showAllTxnsFlag=true;renderTxnPage(getState());};
 window.filterTxnSearch=function(){
-  const q=(document.getElementById('txn-search')?.value||'').trim().toLowerCase();
-  const typeF=document.getElementById('txn-type-filter')?.value||'all';
-  const monthTxns=monthlyEntries(getState());
-  const filtered=monthTxns.filter(t=>{
-    const matchQ=!q||t.name.toLowerCase().includes(q);
-    const matchT=typeF==='all'||t.type===typeF;
-    return matchQ&&matchT;
-  });
-  // Tái dùng renderTxnPage nhưng override danh sách
-  const list=document.getElementById('txn-list');if(!list)return;
-  list.innerHTML='';
-  if(!filtered.length){
-    list.innerHTML=`<div style="padding:20px;text-align:center;color:var(--sub);font-size:13px;font-weight:700">Không tìm thấy giao dịch nào</div>`;
-    return;
-  }
-  // Gọi renderTxnPage với state gốc nhưng txns đã lọc — tạo state tạm
-  renderTxnPage({...getState(),filteredTxns:filtered,showAllTxnsFlag:true});
+  txnSearch=document.getElementById('txn-search')?.value||'';
+  txnTypeFilter=document.getElementById('txn-type-filter')?.value||'all';
+  renderTxnPage(getState());
 };
 
 // ── WALLET / SAVING ───────────────────────────────────────────

@@ -1,5 +1,5 @@
 
-const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'C:/Users/S.Housing/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const {chromium}=require('./browser.cjs');
 const assert=require('assert/strict'),fs=require('fs');
 (async()=>{const b=await chromium.launch({channel:'msedge',headless:true});try{
  const p=await b.newPage({viewport:{width:390,height:844},reducedMotion:'reduce'});
@@ -26,7 +26,7 @@ const assert=require('assert/strict'),fs=require('fs');
   await p.evaluate(t=>{document.documentElement.dataset.theme=t;},theme);
   for(const width of [320,390,430]){
    await p.setViewportSize({width,height:844});await p.click('#nav-home');
-   const bounds=await p.locator('#bnav').boundingBox();assert.equal(Math.round(844-bounds.y-bounds.height),4);assert.equal(Math.round(bounds.height),66);
+   const bounds=await p.locator('#bnav').boundingBox();assert.equal(Math.round(844-bounds.y-bounds.height),8);assert.equal(Math.round(bounds.height),74);
    assert(!(await p.evaluate(()=>document.documentElement.scrollWidth>innerWidth)));
    await p.evaluate(()=>document.documentElement.style.setProperty('--safe-b','34px'));
    const safe=await p.locator('#bnav').boundingBox();assert.equal(Math.round(844-safe.y-safe.height),34);

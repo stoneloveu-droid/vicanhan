@@ -11,6 +11,15 @@ export function paymentAmount(debt, mark) {
 }
 
 export function recordedEntries(entries=[]) { return entries; }
+// Vietnamese search accepts both accented and unaccented input.
+export function filterTransactions(entries=[],query='',type='all') {
+  const normalize=value=>String(value??'').normalize('NFD').replace(/\p{M}/gu,'').replace(/[đĐ]/g,'d').toLowerCase().trim().replace(/\s+/g,' ');
+  const words=normalize(query).split(' ').filter(Boolean);
+  return entries.filter(entry=>{
+    const text=normalize([entry.name,entry.cat,entry.note].filter(Boolean).join(' '));
+    return (type==='all'||entry.type===type)&&words.every(word=>text.includes(word));
+  });
+}
 export function balanceEntries(balanceNotes) { return Array.isArray(balanceNotes)?balanceNotes:[]; }
 export function accountEntries(balanceNotes,walletBase=0){
   const aliases=new Map();

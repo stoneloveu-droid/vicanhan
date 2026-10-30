@@ -1,5 +1,5 @@
 
-const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'C:/Users/S.Housing/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const {chromium}=require('./browser.cjs');
 const assert=require('assert/strict');
 (async()=>{
  const browser=await chromium.launch({channel:'msedge',headless:true});

@@ -27,7 +27,7 @@ const fs=require('node:fs');
         assert(nav.height>600,'Desktop navigation should use a sidebar');
       }else{
         assert.equal(Math.round(nav.height),74);
-        assert.equal(Math.round(900-nav.y-nav.height),8);
+        assert.equal(Math.round(900-nav.y-nav.height),0);
       }
     }
     await page.setViewportSize({width:390,height:844});

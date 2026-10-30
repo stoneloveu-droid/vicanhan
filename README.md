@@ -42,6 +42,8 @@ Kiểm thử trình duyệt cần máy chủ demo và Playwright. Đặt `PLAYWR
 
 `npm run test:visual` kiểm tra 11 màn hình ở chiều rộng 320, 390, 768, 1024 và 1440px, trong chế độ sáng/tối; kiểm tra điều hướng, bộ lọc sau khi lưu và tạo ảnh giao diện trong `artifacts/`.
 
+`npm run test:footer` kiểm tra cả 5 tab khi đổi chiều cao màn hình, vùng an toàn 0/34px và danh sách dài 16 khoản nợ: chân trang phải sát đáy, nằm ngoài vùng cuộn và không che nút thanh toán cuối danh sách. Đặt `FOOTER_ENGINE=webkit` để chạy cùng kiểm thử bằng WebKit (cần cài WebKit của Playwright).
+
 Trước khi phát hành lên GitHub Pages, chạy `npm run version:assets` rồi `npm run check:assets`. CSS và toàn bộ cây module JavaScript dùng cùng mã phiên bản theo nội dung để tránh HTML mới tải lẫn tệp cũ từ bộ nhớ đệm. `npm run test:cache` kiểm tra nâng cấp trên trình duyệt đã lưu CSS/JavaScript cũ và bố cục mobile sau khi nâng cấp.
 
 ## Ngân sách tháng, ví cộng dồn và tự động
@@ -52,4 +54,4 @@ Khoản thu/chi dùng ngày ghi nhận hằng tháng (mặc định ngày 1); n�
 
 Giao dịch có mã ổn định để tránh tạo trùng. Khoản vay cập nhật số kỳ và dư nợ theo lịch; thanh toán thẻ ghi số tiền tháng đã nhập, không suy đoán phần gốc/lãi sao kê. Hoàn tác hoặc xóa khoản tự động được ghi nhớ cho tháng đó. Có thể tắt/bật trong Cài đặt. Ví là ước tính cho đến khi đối chiếu thực tế.
 
-Giao diện dùng nền trung tính, thẻ ngân sách xanh đậm và biểu tượng nét. Màu nhấn mặc định là xanh ngọc; lựa chọn màu và chế độ sáng/tối đã lưu vẫn được giữ. Trên điện thoại, thanh điều hướng cao 74px, cách đáy 8px hoặc khoảng an toàn thiết bị. Từ 1024px, điều hướng chuyển sang cột bên trái và Tổng quan chia hai cột. `node tests/schedule.cjs` kiểm tra tự động, đối chiếu độc lập và vị trí thanh điều hướng.
+Giao diện dùng nền trung tính, thẻ ngân sách xanh đậm và biểu tượng nét. Màu nhấn mặc định là xanh ngọc; lựa chọn màu và chế độ sáng/tối đã lưu vẫn được giữ. Trên điện thoại, thanh điều hướng chiếm phần chân trang riêng, gồm 74px điều hướng và vùng an toàn thiết bị ở bên trong. Nội dung cuộn kết thúc phía trên thanh, không bị che và không để khoảng hở ngoài thanh. Từ 1024px, điều hướng chuyển sang cột bên trái và Tổng quan chia hai cột. `node tests/schedule.cjs` kiểm tra tự động, đối chiếu độc lập và vị trí thanh điều hướng.

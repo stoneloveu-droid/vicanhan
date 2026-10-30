@@ -9,6 +9,7 @@
     "check:assets": "node scripts/version-assets.mjs --check",
     "test:cache": "node tests/cache.cjs",
     "test:account": "node tests/account.cjs",
+    "test:footer": "node tests/footer.cjs",
     "preview": "node dev-server.cjs",
     "preview:demo": "node dev-server.cjs --demo"
   }

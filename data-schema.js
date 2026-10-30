@@ -1,4 +1,4 @@
-import { paymentAmount } from './finance.js?v=1e1a0e23fe9f';
+import { paymentAmount } from './finance.js?v=c24a9dfbaff4';
 
 function resolvePlanDebt(plan,debts,ticks) {
  const name=String(plan.name||'').trim().toLocaleLowerCase('vi-VN').replace(/\s+/g,' ');

@@ -1,26 +1,26 @@
-import { applySchedule, scheduleKey } from './schedule.js?v=1e1a0e23fe9f';
-import { normalizeData } from './data-schema.js?v=1e1a0e23fe9f';
+import { applySchedule, scheduleKey } from './schedule.js?v=c24a9dfbaff4';
+import { normalizeData } from './data-schema.js?v=c24a9dfbaff4';
 // ── app.js ────────────────────────────────────────────────────
 // State trung tâm, Firebase sync, auth, business logic,
 // tất cả window.* event handlers
 // ─────────────────────────────────────────────────────────────
 
-import { isDebtActive, recurringForMonth, plansForMonth, isRecurringPlan, changePlan, monthlyEntries, balanceSummary, accountEntries, planRemaining, monthSummary, paymentAmount, mergeState, escapeHTML, localDate, balanceEntries, recordedEntries } from './finance.js?v=1e1a0e23fe9f';
-import './experience.js?v=1e1a0e23fe9f';
-import { renderBalanceBook } from './notebook-ui.js?v=1e1a0e23fe9f';
+import { isDebtActive, recurringForMonth, plansForMonth, isRecurringPlan, changePlan, monthlyEntries, balanceSummary, accountEntries, planRemaining, monthSummary, paymentAmount, mergeState, escapeHTML, localDate, balanceEntries, recordedEntries } from './finance.js?v=c24a9dfbaff4';
+import './experience.js?v=c24a9dfbaff4';
+import { renderBalanceBook } from './notebook-ui.js?v=c24a9dfbaff4';
 import { auth, db, doc, onSnapshot, runTransaction, getDoc, linkWithPopup,
          GoogleAuthProvider, signInWithPopup, signInAnonymously,
-         onAuthStateChanged, signOut } from "./firebase.js?v=1e1a0e23fe9f";
+         onAuthStateChanged, signOut } from "./firebase.js?v=c24a9dfbaff4";
 import { fmt, fmtNoUnit, getML,
          tcCurrentPayment, tcBalance, tcGetMonthly, tcGetDebt,
-         tcTotalInterest, tcPaymentAtTerm, tcScheduleTable } from "./calc.js?v=1e1a0e23fe9f";
+         tcTotalInterest, tcPaymentAtTerm, tcScheduleTable } from "./calc.js?v=c24a9dfbaff4";
 import { fmtInput, getInputVal, setInputFmt,
          showToast, confirmAction, setSyncBadge,
          initTheme, setTheme, getCurrentTheme, initAccent,
-         setOnPickMonth } from "./ui-utils.js?v=1e1a0e23fe9f";
+         setOnPickMonth } from "./ui-utils.js?v=c24a9dfbaff4";
 import { renderHome, renderPaid, renderCards, renderTxnPage,
          renderSavingList, renderSettings, renderTools, renderSchedule,
-         renderReport, renderLoanBookList, renderAnalyze } from "./render.js?v=1e1a0e23fe9f";
+         renderReport, renderLoanBookList, renderAnalyze } from "./render.js?v=c24a9dfbaff4";
 
 // ── DEFAULTS ─────────────────────────────────────────────────
 const DEF_DEBTS = [];

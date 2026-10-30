@@ -18,6 +18,9 @@ if(new URLSearchParams(location.search).has('paid-legacy')){
 }
 
 if(data)data.automation={enabled:new URLSearchParams(location.search).has('auto'),fromMonth:month,skips:{}};
+if(new URLSearchParams(location.search).has('long-list')){
+ data.debts=Array.from({length:16},(_,index)=>({id:'footer-debt-'+index,name:'Thẻ kiểm tra '+(index+1),type:'td',used:1000000,limit:5000000,monthly:100000,payDay:25}));
+}
 let listener;const snapshot=()=>({exists:()=>!!data,data:()=>clone(data)});
 export const auth={currentUser:{uid:'preview-only',displayName:'Ví trải nghiệm',email:'Dữ liệu mẫu · Không kết nối Firebase',isAnonymous:false}};
 export const db={};export const doc=()=>({});

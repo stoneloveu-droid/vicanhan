@@ -13,8 +13,8 @@
 <title>Ví của tôi</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<link rel="stylesheet" href="style.css?v=1e1a0e23fe9f">
-<link rel="stylesheet" href="aurora.css?v=1e1a0e23fe9f">
+<link rel="stylesheet" href="style.css?v=c24a9dfbaff4">
+<link rel="stylesheet" href="aurora.css?v=c24a9dfbaff4">
 </head>
 <body>
 <div class="loading-overlay" id="loading-overlay"><div class="spinner"></div><p>Đang kết nối…</p></div>
@@ -443,6 +443,6 @@
 <div class="modal-bg" id="modal-wallet" onclick="closeMBg('modal-wallet',event)"><div class="msheet"><div class="mhandle"></div><div class="mtitle">Lịch sử số dư</div><p class="notebook-hint">Mỗi lần kiểm tra và cập nhật số dư được lưu tại đây. Chọn một dòng để sửa thông tin.</p><div id="balance-history"></div><div class="mbtns"><button class="mbtn mbtn-cancel" onclick="closeModal('modal-wallet')">Đóng</button><button class="mbtn mbtn-save" onclick="openBalanceNote()">+ Cập nhật số dư</button></div></div></div>
 <div class="modal-bg" id="modal-balance-note" onclick="closeMBg('modal-balance-note',event)"><div class="msheet"><div class="mhandle"></div><div class="mtitle">Cập nhật số dư</div><div class="fg"><label for="bn-amount">Số dư (đ)</label><input id="bn-amount" inputmode="numeric" oninput="fmtInput(this)" placeholder="0"></div><p class="notebook-hint">Nhập tổng số tiền bạn đang có. Các khoản thu và chi tiếp theo sẽ được cộng hoặc trừ từ số dư này.</p><div class="fg"><label for="bn-date">Ngày cập nhật</label><input id="bn-date" type="date"></div><div class="fg"><label for="bn-note">Ghi chú thêm</label><input id="bn-note" placeholder="Không bắt buộc" maxlength="300"></div><div class="mbtns"><button class="mbtn mbtn-cancel" onclick="closeModal('modal-balance-note')">Đóng</button><button class="mbtn mbtn-del" id="bn-del" onclick="deleteBalanceNote()">Xoá</button><button class="mbtn mbtn-save" onclick="saveBalanceNote()">Lưu</button></div></div></div>
 <div class="settings-footer" hidden id="sync-status-text" role="status"></div>
-<script type="module" src="app.js?v=1e1a0e23fe9f"></script>
+<script type="module" src="app.js?v=c24a9dfbaff4"></script>
 </body>
 </html>

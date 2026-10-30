@@ -90,26 +90,19 @@ window.toggleDarkMode=function(on){
 };
 
 // ── ACCENT ────────────────────────────────────────────────────
-const ACCENTS={
-  lime:   {accent:'#C8FF57',dark:'#0F0F14'},
-  blue:   {accent:'#57C8FF',dark:'#0F0F14'},
-  green:  {accent:'#4CAF50',dark:'#fff'},
-  orange: {accent:'#FF9800',dark:'#0F0F14'},
-  purple: {accent:'#C57BFF',dark:'#0F0F14'},
-};
+const ACCENTS={lime:'Lime',blue:'Xanh dương',green:'Xanh ngọc',orange:'Cam',purple:'Tím'};
 window.setAccent=function(name){
-  const a=ACCENTS[name];if(!a)return;
-  document.documentElement.style.setProperty('--accent',a.accent);
+  if(!Object.hasOwn(ACCENTS,name))return;
+  document.documentElement.dataset.accent=name;
   localStorage.setItem('vn_accent',name);
   const sub=document.getElementById('theme-sub');
-  const labels={lime:'Lime',blue:'Xanh',green:'Lá',orange:'Cam',purple:'Tím'};
-  if(sub) sub.textContent=labels[name]||name;
+  if(sub) sub.textContent=ACCENTS[name];
   document.querySelectorAll('.tp-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('tp-'+name)?.classList.add('active');
   window.closeModal('modal-theme');
 };
 export function initAccent(){
-  const saved=localStorage.getItem('vn_accent')||'purple';
+  const saved=localStorage.getItem('vn_accent')||'green';
   window.setAccent(saved);
 }
 
